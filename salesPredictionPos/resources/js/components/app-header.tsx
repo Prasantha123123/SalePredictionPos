@@ -1,248 +1,283 @@
+import { useState, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
+import {
+    Bell,
+    ChevronDown,
+    Command,
+    Plus,
+    Search,
+    Sun,
+    Moon,
+    ShoppingCart,
+    PackagePlus,
+    UserPlus,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
-import AppLogoIcon from '@/components/app-logo-icon';
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-    NavigationMenu,
-    NavigationMenuItem,
-    NavigationMenuList,
-    navigationMenuTriggerStyle,
-} from '@/components/ui/navigation-menu';
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from '@/components/ui/sheet';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
+    Dialog,
+    DialogContent,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { UserMenuContent } from '@/components/user-menu-content';
-import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';
-import { cn, toUrl } from '@/lib/utils';
-import { dashboard } from '@/routes';
-import type { BreadcrumbItem, NavItem } from '@/types';
+import { useAppearance } from '@/hooks/use-appearance';
+import type { BreadcrumbItem } from '@/types';
 
 type Props = {
     breadcrumbs?: BreadcrumbItem[];
 };
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
-
-const rightNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
-];
-
-const activeItemStyles =
-    'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
-
 export function AppHeader({ breadcrumbs = [] }: Props) {
     const page = usePage();
     const { auth } = page.props;
     const getInitials = useInitials();
-    const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
+    const { appearance, updateAppearance } = useAppearance();
+
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Global keyboard shortcut Ctrl+K / Cmd+K
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                setSearchOpen((prev) => !prev);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    const toggleTheme = () => {
+        updateAppearance(appearance === 'dark' ? 'light' : 'dark');
+    };
+
+    const mockNotifications = [
+        { id: 1, title: 'AI Demand Alert', text: 'Artisan Coffee predicted demand +35% tomorrow.', time: '5m ago', type: 'ai' },
+        { id: 2, title: 'Low Stock Threshold', text: 'Organic Milk 1L down to 4 units in main warehouse.', time: '12m ago', type: 'stock' },
+        { id: 3, title: 'Order Completed', text: 'Sale #POS-1049 ($142.50) processed successfully.', time: '1h ago', type: 'sale' },
+    ];
+
+    const searchQuickLinks = [
+        { title: 'POS Terminal', href: '/pos', category: 'Pages' },
+        { title: 'AI Demand Forecast', href: '/forecasts', category: 'Pages' },
+        { title: 'Products Catalogue', href: '/products', category: 'Inventory' },
+        { title: 'Stock Movements', href: '/inventory', category: 'Inventory' },
+        { title: 'Customer Directory', href: '/customers', category: 'CRM' },
+        { title: 'Sales Analytics', href: '/reports', category: 'Reports' },
+    ];
+
+    const filteredLinks = searchQuickLinks.filter((l) =>
+        l.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        l.category.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     return (
         <>
-            <div className="border-b border-sidebar-border/80">
-                <div className="mx-auto flex h-16 items-center px-4 md:max-w-7xl">
-                    {/* Mobile Menu */}
-                    <div className="lg:hidden">
-                        <Sheet>
-                            <SheetTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="mr-2 h-[34px] w-[34px]"
-                                >
-                                    <Menu className="h-5 w-5" />
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent
-                                side="left"
-                                className="flex h-full w-64 flex-col items-stretch justify-between bg-sidebar"
-                            >
-                                <SheetTitle className="sr-only">
-                                    Navigation menu
-                                </SheetTitle>
-                                <SheetHeader className="flex justify-start text-left">
-                                    <AppLogoIcon className="h-6 w-6 fill-current text-black dark:text-white" />
-                                </SheetHeader>
-                                <div className="flex h-full flex-1 flex-col space-y-4 p-4">
-                                    <div className="flex h-full flex-col justify-between text-sm">
-                                        <div className="flex flex-col space-y-4">
-                                            {mainNavItems.map((item) => (
-                                                <Link
-                                                    key={item.title}
-                                                    href={item.href}
-                                                    className="flex items-center space-x-2 font-medium"
-                                                >
-                                                    {item.icon && (
-                                                        <item.icon className="h-5 w-5" />
-                                                    )}
-                                                    <span>{item.title}</span>
-                                                </Link>
-                                            ))}
-                                        </div>
+            <header className="sticky top-0 z-30 h-16 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl transition-all">
+                <div className="mx-auto flex h-full items-center justify-between px-4 sm:px-6">
+                    {/* Left Sidebar Trigger + Breadcrumbs */}
+                    <div className="flex items-center gap-3">
+                        <SidebarTrigger className="size-9 rounded-xl hover:bg-muted shrink-0" />
 
-                                        <div className="flex flex-col space-y-4">
-                                            {rightNavItems.map((item) => (
-                                                <a
-                                                    key={item.title}
-                                                    href={toUrl(item.href)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="flex items-center space-x-2 font-medium"
-                                                >
-                                                    {item.icon && (
-                                                        <item.icon className="h-5 w-5" />
-                                                    )}
-                                                    <span>{item.title}</span>
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </SheetContent>
-                        </Sheet>
-                    </div>
-
-                    <Link
-                        href={dashboard()}
-                        prefetch
-                        className="flex items-center space-x-2"
-                    >
-                        <AppLogo />
-                    </Link>
-
-                    {/* Desktop Navigation */}
-                    <div className="ml-6 hidden h-full items-center space-x-6 lg:flex">
-                        <NavigationMenu className="flex h-full items-stretch">
-                            <NavigationMenuList className="flex h-full items-stretch space-x-2">
-                                {mainNavItems.map((item, index) => (
-                                    <NavigationMenuItem
-                                        key={index}
-                                        className="relative flex h-full items-center"
-                                    >
-                                        <Link
-                                            href={item.href}
-                                            className={cn(
-                                                navigationMenuTriggerStyle(),
-                                                whenCurrentUrl(
-                                                    item.href,
-                                                    activeItemStyles,
-                                                ),
-                                                'h-9 cursor-pointer px-3',
-                                            )}
-                                        >
-                                            {item.icon && (
-                                                <item.icon className="mr-2 h-4 w-4" />
-                                            )}
-                                            {item.title}
-                                        </Link>
-                                        {isCurrentUrl(item.href) && (
-                                            <div className="absolute bottom-0 left-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"></div>
-                                        )}
-                                    </NavigationMenuItem>
-                                ))}
-                            </NavigationMenuList>
-                        </NavigationMenu>
-                    </div>
-
-                    <div className="ml-auto flex items-center space-x-2">
-                        <div className="relative flex items-center space-x-1">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="group h-9 w-9 cursor-pointer"
-                            >
-                                <Search className="!size-5 opacity-80 group-hover:opacity-100" />
-                            </Button>
-                            <div className="ml-1 hidden gap-1 lg:flex">
-                                {rightNavItems.map((item) => (
-                                    <Tooltip key={item.title}>
-                                        <TooltipTrigger>
-                                            <a
-                                                href={toUrl(item.href)}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="group inline-flex h-9 w-9 items-center justify-center rounded-md bg-transparent p-0 text-sm font-medium text-accent-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-                                            >
-                                                <span className="sr-only">
-                                                    {item.title}
-                                                </span>
-                                                {item.icon && (
-                                                    <item.icon className="size-5 opacity-80 group-hover:opacity-100" />
-                                                )}
-                                            </a>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>{item.title}</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                ))}
-                            </div>
+                        <div className="lg:hidden">
+                            <Link href="/dashboard">
+                                <AppLogo />
+                            </Link>
                         </div>
+                        {breadcrumbs.length > 0 && (
+                            <div className="hidden sm:block">
+                                <Breadcrumbs breadcrumbs={breadcrumbs} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Middle Quick Search Bar */}
+                    <button
+                        onClick={() => setSearchOpen(true)}
+                        className="hidden md:flex items-center justify-between w-64 lg:w-80 h-9 px-3 rounded-xl bg-muted/40 hover:bg-muted/70 border border-border/50 text-xs text-muted-foreground transition-all cursor-pointer group"
+                    >
+                        <div className="flex items-center gap-2">
+                            <Search className="size-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            <span>Search products, sales, customers...</span>
+                        </div>
+                        <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-border bg-background text-[10px] font-mono font-medium">
+                            <Command className="size-2.5" /> K
+                        </kbd>
+                    </button>
+
+                    {/* Right Tools & Actions */}
+                    <div className="flex items-center gap-2">
+                        {/* Quick Add Menu */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    size="sm"
+                                    className="h-9 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs shadow-md shadow-blue-500/20 gap-1.5"
+                                >
+                                    <Plus className="size-3.5" />
+                                    <span className="hidden sm:inline">Quick Add</span>
+                                    <ChevronDown className="size-3 opacity-70" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 rounded-xl p-1.5">
+                                <DropdownMenuItem asChild className="rounded-lg text-xs gap-2 cursor-pointer">
+                                    <Link href="/pos">
+                                        <ShoppingCart className="size-4 text-emerald-500" />
+                                        <span>New Checkout Sale</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild className="rounded-lg text-xs gap-2 cursor-pointer">
+                                    <Link href="/products">
+                                        <PackagePlus className="size-4 text-blue-500" />
+                                        <span>Add New Product</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild className="rounded-lg text-xs gap-2 cursor-pointer">
+                                    <Link href="/customers">
+                                        <UserPlus className="size-4 text-amber-500" />
+                                        <span>Register Customer</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Search Button for Mobile */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSearchOpen(true)}
+                            className="md:hidden size-9 rounded-xl"
+                        >
+                            <Search className="size-4" />
+                        </Button>
+
+                        {/* Theme Toggle */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={toggleTheme}
+                            className="size-9 rounded-xl hover:bg-muted"
+                            title="Toggle Light / Dark Mode"
+                        >
+                            {appearance === 'dark' ? (
+                                <Sun className="size-4 text-amber-400" />
+                            ) : (
+                                <Moon className="size-4 text-slate-700" />
+                            )}
+                        </Button>
+
+                        {/* Notifications Dropdown */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
                                     variant="ghost"
-                                    className="size-10 rounded-full p-1"
+                                    size="icon"
+                                    className="relative size-9 rounded-xl hover:bg-muted"
                                 >
-                                    <Avatar className="size-8 overflow-hidden rounded-full">
-                                        <AvatarImage
-                                            src={auth.user?.avatar}
-                                            alt={auth.user?.name}
-                                        />
-                                        <AvatarFallback className="rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white">
-                                            {getInitials(auth.user?.name ?? '')}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <Bell className="size-4 text-foreground/80" />
+                                    <span className="absolute top-2 right-2 size-2 rounded-full bg-blue-600 ring-2 ring-background animate-pulse" />
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-56" align="end">
-                                {auth.user && (
-                                    <UserMenuContent user={auth.user} />
-                                )}
+                            <DropdownMenuContent align="end" className="w-80 p-0 rounded-2xl shadow-xl">
+                                <div className="p-3.5 border-b border-border/60 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold">Notifications</span>
+                                        <span className="px-1.5 py-0.5 rounded-full bg-blue-500/10 text-[10px] font-extrabold text-blue-600 dark:text-blue-400">
+                                            3 New
+                                        </span>
+                                    </div>
+                                    <button className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                                        Mark all read
+                                    </button>
+                                </div>
+                                <div className="divide-y divide-border/40 max-h-72 overflow-y-auto">
+                                    {mockNotifications.map((n) => (
+                                        <div key={n.id} className="p-3 hover:bg-muted/40 transition-colors flex items-start gap-2.5">
+                                            <div className="size-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                                            <div className="space-y-0.5 flex-1">
+                                                <p className="text-xs font-semibold text-foreground">{n.title}</p>
+                                                <p className="text-[11px] text-muted-foreground leading-snug">{n.text}</p>
+                                                <span className="text-[10px] text-muted-foreground/70">{n.time}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Profile User Dropdown */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    className="h-9 gap-2 pl-1 pr-2 rounded-full hover:bg-muted"
+                                >
+                                    <Avatar className="size-7 border border-border">
+                                        <AvatarImage src={auth.user?.avatar} alt={auth.user?.name} />
+                                        <AvatarFallback className="bg-blue-600 text-white font-bold text-xs">
+                                            {getInitials(auth.user?.name ?? 'Admin')}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-xs font-semibold hidden sm:inline max-w-[100px] truncate">
+                                        {auth.user?.name ?? 'Super Admin'}
+                                    </span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56 rounded-2xl p-1.5">
+                                {auth.user && <UserMenuContent user={auth.user} />}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
                 </div>
-            </div>
-            {breadcrumbs.length > 1 && (
-                <div className="flex w-full border-b border-sidebar-border/70">
-                    <div className="mx-auto flex h-12 w-full items-center justify-start px-4 text-neutral-500 md:max-w-7xl">
-                        <Breadcrumbs breadcrumbs={breadcrumbs} />
+            </header>
+
+            {/* Global Search Dialog Modal */}
+            <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+                <DialogContent className="sm:max-w-lg rounded-2xl p-0 overflow-hidden">
+                    <div className="p-4 border-b border-border flex items-center gap-3">
+                        <Search className="size-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Type to search POS navigation, products, reports..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="border-none shadow-none focus-visible:ring-0 text-sm h-8"
+                            autoFocus
+                        />
                     </div>
-                </div>
-            )}
+                    <div className="p-2 max-h-80 overflow-y-auto divide-y divide-border/30">
+                        {filteredLinks.length > 0 ? (
+                            filteredLinks.map((item, index) => (
+                                <Link
+                                    key={index}
+                                    href={item.href}
+                                    onClick={() => setSearchOpen(false)}
+                                    className="flex items-center justify-between p-2.5 rounded-xl hover:bg-muted/60 transition-colors"
+                                >
+                                    <span className="text-xs font-medium">{item.title}</span>
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                        {item.category}
+                                    </span>
+                                </Link>
+                            ))
+                        ) : (
+                            <div className="p-8 text-center text-xs text-muted-foreground">
+                                No matching resources found. Try another search.
+                            </div>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
