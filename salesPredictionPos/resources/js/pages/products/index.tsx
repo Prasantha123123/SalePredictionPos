@@ -47,7 +47,6 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
     const [search, setSearch] = useState(filters.search || '');
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
-    // Product Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
@@ -60,8 +59,12 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
         cost: '',
         description: '',
         is_active: true,
+        has_expiry: false,
         initial_stock: '0',
         low_stock_threshold: '10',
+        batch_number: '',
+        expiry_date: '',
+        manufacture_date: '',
     });
 
     const openCreateModal = () => {
@@ -71,7 +74,7 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
         setIsModalOpen(true);
     };
 
-    const openEditModal = (product: Product) => {
+    const openEditModal = (product: Product & { has_expiry?: boolean }) => {
         setEditingProduct(product);
         clearErrors();
         setData({
@@ -83,8 +86,12 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
             cost: product.cost ? product.cost.toString() : '',
             description: product.description || '',
             is_active: product.is_active,
+            has_expiry: !!product.has_expiry,
             initial_stock: product.inventory?.quantity ? product.inventory.quantity.toString() : '0',
             low_stock_threshold: product.inventory?.low_stock_threshold ? product.inventory.low_stock_threshold.toString() : '10',
+            batch_number: '',
+            expiry_date: '',
+            manufacture_date: '',
         });
         setIsModalOpen(true);
     };
@@ -234,7 +241,16 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
 
                                         return (
                                             <tr key={product.id} className="hover:bg-muted/30 transition-colors">
-                                                <td className="px-4 py-3.5 font-bold text-foreground">{product.name}</td>
+                                                <td className="px-4 py-3.5 font-bold text-foreground">
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{product.name}</span>
+                                                        {!!(product as any).has_expiry && (
+                                                            <span className="px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold text-[8px] uppercase tracking-wider border border-rose-500/20">
+                                                                FEFO
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td className="px-4 py-3.5 font-mono text-muted-foreground">{product.sku}</td>
                                                 <td className="px-4 py-3.5">
                                                     <span className="px-2.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[10px]">
@@ -419,6 +435,58 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
                                     className="h-10 rounded-xl"
                                 />
                             </div>
+
+                            <div className="col-span-2 flex items-center gap-2 py-1">
+                                <input
+                                    type="checkbox"
+                                    id="has_expiry"
+                                    checked={data.has_expiry}
+                                    onChange={(e) => setData('has_expiry', e.target.checked)}
+                                    className="rounded border-border text-blue-600 focus:ring-blue-500 size-4"
+                                />
+                                <label htmlFor="has_expiry" className="text-xs font-bold text-foreground cursor-pointer select-none">
+                                    Product has Expiry Date (Track inventory batches FEFO)
+                                </label>
+                            </div>
+
+                            {data.has_expiry && !editingProduct && (
+                                <>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-muted-foreground">Batch Number *</label>
+                                        <Input
+                                            type="text"
+                                            required={data.has_expiry}
+                                            placeholder="e.g. BATCH-001"
+                                            value={data.batch_number}
+                                            onChange={(e) => setData('batch_number', e.target.value)}
+                                            className="h-10 rounded-xl"
+                                        />
+                                        {errors.batch_number && <p className="text-[11px] text-destructive">{errors.batch_number}</p>}
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-muted-foreground">Expiry Date *</label>
+                                        <Input
+                                            type="date"
+                                            required={data.has_expiry}
+                                            value={data.expiry_date}
+                                            onChange={(e) => setData('expiry_date', e.target.value)}
+                                            className="h-10 rounded-xl"
+                                        />
+                                        {errors.expiry_date && <p className="text-[11px] text-destructive">{errors.expiry_date}</p>}
+                                    </div>
+
+                                    <div className="space-y-1 col-span-2">
+                                        <label className="text-xs font-semibold text-muted-foreground">Manufacture Date</label>
+                                        <Input
+                                            type="date"
+                                            value={data.manufacture_date}
+                                            onChange={(e) => setData('manufacture_date', e.target.value)}
+                                            className="h-10 rounded-xl"
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         <div className="flex justify-end gap-2 pt-3 border-t border-border/50">

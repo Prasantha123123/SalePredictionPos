@@ -56,14 +56,19 @@ class ForecastController extends Controller
             ])
             ->toArray();
 
+        $latestPrediction = SalesPrediction::whereNotNull('metrics')->latest()->first();
+        $metrics = $latestPrediction ? $latestPrediction->metrics : null;
+        $bestModelName = $latestPrediction ? $latestPrediction->model_used : 'XGBoost';
+
         return Inertia::render('forecasts/index', [
             'futurePredictions' => $futurePredictions,
             'historicalAccuracy' => $historicalAccuracy,
             'averageErrorPercent' => round($avgAccuracy ?? 0, 1),
             'aiRecommendations' => $aiRecommendations,
             'modelInfo' => [
-                'name' => 'XGBoost Regressor',
+                'name' => ucfirst($bestModelName) . ' Regressor',
                 'features' => ['day_of_week', 'month', 'is_weekend', 'sales_last_1_day', 'sales_last_7_days', 'transactions', 'discount_amount'],
+                'metrics' => $metrics,
             ],
         ]);
     }

@@ -2,12 +2,14 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-from model import predict_sales, train_model
+import os
+import joblib
+from model import predict_sales, train_model, METRICS_PATH
 
 app = FastAPI(
     title="Smart POS ML Forecasting Service",
-    description="Python FastAPI service powered by XGBoost for Sri Lankan SME sales predictions",
-    version="1.0.0"
+    description="Python FastAPI service powered by XGBoost and Random Forest for Sri Lankan SME sales predictions",
+    version="1.1.0"
 )
 
 class SalesMetrics(BaseModel):
@@ -27,22 +29,36 @@ class PredictRequest(BaseModel):
 def root():
     return {
         "status": "online",
-        "service": "Smart POS XGBoost Sales Predictor",
+        "service": "Smart POS XGBoost & Random Forest Sales Predictor",
         "docs": "http://127.0.0.1:8001/docs",
-        "health": "http://127.0.0.1:8001/health"
+        "health": "http://127.0.0.1:8001/health",
+        "metrics": "http://127.0.0.1:8001/metrics"
     }
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "service": "XGBoost Sales Predictor"}
+    return {"status": "healthy", "service": "XGBoost & RF Sales Predictor"}
+
+@app.get("/metrics")
+def get_metrics_endpoint():
+    """Retrieve details and accuracy metrics of the trained model."""
+    if os.path.exists(METRICS_PATH):
+        try:
+            return joblib.load(METRICS_PATH)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error reading metrics: {str(e)}")
+    return {"message": "No model trained yet. Run /train first."}
 
 @app.post("/train")
 def train_endpoint(payload: TrainRequest):
     try:
         data_dicts = [item.model_dump() for item in payload.history]
-        success = train_model(data_dicts)
-        if success:
-            return {"message": "Model trained successfully."}
+        metrics_summary = train_model(data_dicts)
+        if metrics_summary:
+            return {
+                "message": "Model trained successfully.",
+                "metrics": metrics_summary
+            }
         else:
             return {"message": "Model training skipped. Insufficient data."}
     except Exception as e:

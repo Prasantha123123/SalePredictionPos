@@ -22,12 +22,14 @@ class Product extends Model
         'image',
         'description',
         'is_active',
+        'has_expiry',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
         'cost' => 'decimal:2',
         'is_active' => 'boolean',
+        'has_expiry' => 'boolean',
     ];
 
     /**
@@ -44,6 +46,14 @@ class Product extends Model
     public function inventory(): HasOne
     {
         return $this->hasOne(Inventory::class);
+    }
+
+    /**
+     * @return HasMany<InventoryBatch, $this>
+     */
+    public function batches(): HasMany
+    {
+        return $this->hasMany(InventoryBatch::class);
     }
 
     /**

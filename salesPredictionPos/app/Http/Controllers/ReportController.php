@@ -19,6 +19,10 @@ use Inertia\Response;
 
 class ReportController extends Controller
 {
+    public function __construct(
+        protected \App\Services\ExpiryService $expiryService
+    ) {}
+
     /**
      * Main Analytics Dashboard
      */
@@ -600,6 +604,41 @@ class ReportController extends Controller
             'filters' => [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
+            ],
+        ]);
+    }
+
+    /**
+     * Expiry and Waste Auditing Report
+     */
+    public function expiryReport(Request $request): Response
+    {
+        $filter = $request->input('filter', 'all');
+        $batches = $this->expiryService->getExpiringBatchesReport($filter === 'all' ? null : $filter);
+
+        $expiredLoss = 0.0;
+        $totalWastedItems = 0;
+        $activeBatchesCount = 0;
+
+        foreach ($batches as $b) {
+            if ($b['status'] === 'expired') {
+                $expiredLoss += $b['cost_price'] * $b['quantity'];
+                $totalWastedItems += $b['quantity'];
+            } else {
+                $activeBatchesCount++;
+            }
+        }
+
+        return Inertia::render('reports/expiry-report', [
+            'batches' => $batches,
+            'summary' => [
+                'expiredLoss' => round($expiredLoss, 2),
+                'totalWastedItems' => $totalWastedItems,
+                'activeBatchesCount' => $activeBatchesCount,
+                'totalAlertsCount' => count($batches),
+            ],
+            'filters' => [
+                'filter' => $filter,
             ],
         ]);
     }

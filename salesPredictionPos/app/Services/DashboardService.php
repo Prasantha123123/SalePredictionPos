@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
+    public function __construct(
+        protected ExpiryService $expiryService
+    ) {}
+
     /**
      * Get all KPI data for the dashboard.
      */
@@ -38,6 +42,9 @@ class DashboardService
             ->latest()
             ->first();
 
+        // Get expiry summaries
+        $expirySummary = $this->expiryService->getExpiryAlertSummary();
+
         return [
             'today_sales' => round((float) $todaySales, 2),
             'yesterday_sales' => round((float) $yesterdaySales, 2),
@@ -52,6 +59,7 @@ class DashboardService
             'prediction_confidence' => $tomorrowPrediction
                 ? (float) $tomorrowPrediction->confidence
                 : null,
+            'expiry_alerts' => $expirySummary,
         ];
     }
 

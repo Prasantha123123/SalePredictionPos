@@ -186,22 +186,43 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                     className="relative size-9 rounded-xl hover:bg-muted"
                                 >
                                     <Bell className="size-4 text-foreground/80" />
-                                    <span className="absolute top-2 right-2 size-2 rounded-full bg-blue-600 ring-2 ring-background animate-pulse" />
+                                    {((page.props.expiry_alerts_count as number) || 0) > 0 && (
+                                        <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-rose-600 text-[8px] font-black text-white ring-2 ring-background animate-pulse">
+                                            {page.props.expiry_alerts_count as number}
+                                        </span>
+                                    )}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-80 p-0 rounded-2xl shadow-xl">
                                 <div className="p-3.5 border-b border-border/60 flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs font-bold">Notifications</span>
-                                        <span className="px-1.5 py-0.5 rounded-full bg-blue-500/10 text-[10px] font-extrabold text-blue-600 dark:text-blue-400">
-                                            3 New
-                                        </span>
+                                        {((page.props.expiry_alerts_count as number) || 0) > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded-full bg-rose-500/10 text-[10px] font-extrabold text-rose-600">
+                                                {page.props.expiry_alerts_count as number} Alerts
+                                            </span>
+                                        )}
                                     </div>
                                     <button className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium">
                                         Mark all read
                                     </button>
                                 </div>
                                 <div className="divide-y divide-border/40 max-h-72 overflow-y-auto">
+                                    {((page.props.expiry_alerts_count as number) || 0) > 0 && (
+                                        <Link
+                                            href="/reports/expiry-report"
+                                            className="p-3 hover:bg-rose-500/5 transition-colors flex items-start gap-2.5 bg-rose-500/5"
+                                        >
+                                            <div className="size-2 rounded-full bg-rose-500 mt-1.5 shrink-0 animate-ping" />
+                                            <div className="space-y-0.5 flex-1">
+                                                <p className="text-xs font-bold text-rose-600">Inventory Expiry Alert</p>
+                                                <p className="text-[11px] text-rose-700 leading-snug">
+                                                    {page.props.expiry_alerts_count as number} batches have expired or are expiring within 30 days.
+                                                </p>
+                                                <span className="text-[10px] font-semibold text-rose-500 hover:underline">View Expiry Report →</span>
+                                            </div>
+                                        </Link>
+                                    )}
                                     {mockNotifications.map((n) => (
                                         <div key={n.id} className="p-3 hover:bg-muted/40 transition-colors flex items-start gap-2.5">
                                             <div className="size-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />

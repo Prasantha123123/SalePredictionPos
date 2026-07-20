@@ -98,6 +98,17 @@ class PredictionService
                 }
             }
 
+            // Fetch model metrics if available
+            $metricsData = null;
+            try {
+                $metricsResponse = Http::timeout(3)->get("{$this->baseUrl}/metrics");
+                if ($metricsResponse->successful()) {
+                    $metricsData = $metricsResponse->json();
+                }
+            } catch (\Exception $ex) {
+                Log::warning('Could not retrieve model metrics: ' . $ex->getMessage());
+            }
+
             $response = Http::timeout(10)->post("{$this->baseUrl}/predict", [
                 'last_known' => $lastKnown,
                 'days' => 30,
@@ -113,12 +124,13 @@ class PredictionService
                         [
                             'predicted_amount' => $pred['predicted_amount'],
                             'confidence' => $pred['confidence'],
-                            'model_used' => 'xgboost',
+                            'model_used' => $metricsData['best_model'] ?? 'xgboost',
                             'features' => [
                                 'day_of_week' => Carbon::parse($pred['date'])->dayOfWeek,
                                 'month' => Carbon::parse($pred['date'])->month,
                                 'is_weekend' => Carbon::parse($pred['date'])->isWeekend() ? 1 : 0,
                             ],
+                            'metrics' => $metricsData['metrics'] ?? null,
                         ]
                     );
                 }

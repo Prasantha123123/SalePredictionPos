@@ -39,6 +39,14 @@ interface KpiData {
     low_stock_count: number;
     predicted_tomorrow: number | null;
     prediction_confidence: number | null;
+    expiry_alerts?: {
+        expired: number;
+        expiring_today: number;
+        expiring_3_days: number;
+        expiring_7_days: number;
+        expiring_30_days: number;
+        total_alerts: number;
+    };
 }
 
 interface SalesTrend {
@@ -107,6 +115,22 @@ export default function Dashboard({ kpi, salesTrend = [], topProducts = [], cate
                         </Button>
                     </div>
                 </div>
+
+                {/* Expiry Alerts Banner */}
+                {((kpi?.expiry_alerts?.total_alerts || 0) > 0) && (
+                    <div className="p-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 text-rose-700 dark:text-rose-400 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                        <AlertCircle className="size-5 text-rose-500 shrink-0 mt-0.5 sm:mt-0" />
+                        <div className="text-xs flex-1">
+                            <span className="font-bold">Inventory Risk Alert: </span>
+                            {kpi.expiry_alerts?.expired || 0} batches have already expired, and {kpi.expiry_alerts?.expiring_7_days || 0} batches are expiring in 7 days.
+                        </div>
+                        <Button size="sm" variant="ghost" asChild className="h-8 rounded-xl text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 self-end sm:self-auto shrink-0">
+                            <Link href="/reports/expiry-report" className="font-bold text-[11px]">
+                                Resolve Batches &rarr;
+                            </Link>
+                        </Button>
+                    </div>
+                )}
 
                 {/* Top KPI Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

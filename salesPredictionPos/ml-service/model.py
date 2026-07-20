@@ -2,10 +2,26 @@ import os
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import joblib
 from datetime import datetime, timedelta
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "sales_xgb_model.joblib")
+METRICS_PATH = os.path.join(os.path.dirname(__file__), "model_metrics.joblib")
+
+def remove_outliers_iqr(df: pd.DataFrame, col: str) -> pd.DataFrame:
+    """Remove outliers from a dataframe column using the IQR method."""
+    q1 = df[col].quantile(0.25)
+    q3 = df[col].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    # Cap outliers instead of dropping to keep time continuity
+    df[col] = df[col].clip(lower=lower_bound, upper=upper_bound)
+    return df
 
 def prep_features(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -15,6 +31,14 @@ def prep_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values('date').reset_index(drop=True)
+    
+    # Clean missing values
+    df['total_sales'] = df['total_sales'].fillna(0.0)
+    df['transactions'] = df['transactions'].fillna(0)
+    df['discount_amount'] = df['discount_amount'].fillna(0.0)
+    
+    # Handle outliers on sales
+    df = remove_outliers_iqr(df, 'total_sales')
     
     # Feature Engineering
     df['day_of_week'] = df['date'].dt.dayofweek
@@ -31,44 +55,94 @@ def prep_features(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-def train_model(historical_data: list):
+def compute_mape(y_true, y_pred) -> float:
+    """Calculate Mean Absolute Percentage Error."""
+    y_true, y_pred = np.array(y_true), np.array(y_pred)
+    mask = y_true != 0
+    if not np.any(mask):
+        return 0.0
+    return float(np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100)
+
+def train_model(historical_data: list) -> dict:
     """
-    Trained model using a list of dicts: [{'date': 'YYYY-MM-DD', 'total_sales': X, 'transactions': Y, 'discount_amount': Z}]
+    Train multiple models (XGBoost, Random Forest, Linear Regression),
+    compare their performance metrics (RMSE, MAE, MAPE, R2),
+    and save the best performing model.
     """
     if len(historical_data) < 10:
-        # Fallback if too few data points
-        print("Too little data to train XGBoost model. Minimum 10 days required.")
-        return False
+        print("Too little data to train models. Minimum 10 days required.")
+        return {}
         
     df = pd.DataFrame(historical_data)
     df = prep_features(df)
     
-    # Define Target and Features
     features = ['day_of_week', 'month', 'is_weekend', 'sales_last_1_day', 'sales_last_7_days', 'transactions', 'discount_amount']
     X = df[features]
     y = df['total_sales']
     
-    # Fit XGBoost Regressor
-    model = xgb.XGBRegressor(
-        n_estimators=100,
-        learning_rate=0.05,
-        max_depth=5,
-        random_state=42
-    )
-    model.fit(X, y)
+    # Train/Test Split (80/20)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=False)
     
-    # Save model and metadata
-    joblib.dump(model, MODEL_PATH)
-    print(f"XGBoost model successfully trained and saved to {MODEL_PATH}")
-    return True
+    models = {
+        'xgboost': xgb.XGBRegressor(n_estimators=100, learning_rate=0.05, max_depth=5, random_state=42),
+        'random_forest': RandomForestRegressor(n_estimators=100, max_depth=6, random_state=42),
+        'linear_regression': LinearRegression()
+    }
+    
+    best_model_name = None
+    best_model = None
+    best_mape = float('inf')
+    comparison_metrics = {}
+    
+    for name, model in models.items():
+        # Train
+        model.fit(X_train, y_train)
+        
+        # Predict on test set
+        preds = model.predict(X_test)
+        preds = np.clip(preds, a_min=0, a_max=None)
+        
+        # Calculate evaluation metrics
+        rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
+        mae = float(mean_absolute_error(y_test, preds))
+        mape = compute_mape(y_test, preds)
+        r2 = float(r2_score(y_test, preds))
+        
+        comparison_metrics[name] = {
+            'rmse': rmse,
+            'mae': mae,
+            'mape': mape,
+            'r2': r2
+        }
+        
+        # Select best model by lowest MAPE
+        if mape < best_mape:
+            best_mape = mape
+            best_model_name = name
+            best_model = model
+            
+    # Save the best model
+    joblib.dump(best_model, MODEL_PATH)
+    
+    # Save metrics metadata
+    metrics_summary = {
+        'best_model': best_model_name,
+        'metrics': comparison_metrics[best_model_name],
+        'comparison': comparison_metrics,
+        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    joblib.dump(metrics_summary, METRICS_PATH)
+    
+    print(f"Best model '{best_model_name}' successfully trained and saved with MAPE: {best_mape:.2f}%")
+    return metrics_summary
 
 def predict_sales(last_known_data: dict, days_to_predict: int = 30) -> list:
     """
-    Predict sales for the next N days.
+    Predict sales for the next N days recursively.
     """
     if not os.path.exists(MODEL_PATH):
-        # Fallback smart baseline if no model file exists
-        print("No trained model found. Using statistical fallback projection.")
+        # Fallback projection if model isn't built yet
+        print("No trained model found. Using statistical baseline.")
         predictions = []
         base_sales = float(last_known_data.get('total_sales', 45000))
         last_date = datetime.strptime(last_known_data.get('date', datetime.today().strftime('%Y-%m-%d')), '%Y-%m-%d')
@@ -90,7 +164,6 @@ def predict_sales(last_known_data: dict, days_to_predict: int = 30) -> list:
     # Load model
     model = joblib.load(MODEL_PATH)
     
-    # We will simulate recursive multi-step forecasting
     predictions = []
     current_date = datetime.strptime(last_known_data['date'], '%Y-%m-%d')
     
@@ -98,7 +171,6 @@ def predict_sales(last_known_data: dict, days_to_predict: int = 30) -> list:
     current_tx = int(last_known_data.get('transactions', 100))
     current_disc = float(last_known_data.get('discount_amount', 0))
     
-    # Simple queue to compute rolling 7 days mean
     rolling_sales = [current_sales] * 7
     
     for i in range(1, days_to_predict + 1):
@@ -110,7 +182,7 @@ def predict_sales(last_known_data: dict, days_to_predict: int = 30) -> list:
         sales_last_1 = current_sales
         sales_last_7 = sum(rolling_sales) / len(rolling_sales)
         
-        # Prepare feature vector matching training schema
+        # Build features vector matching model definition schema
         feature_row = pd.DataFrame([{
             'day_of_week': day_of_week,
             'month': month,
@@ -121,17 +193,17 @@ def predict_sales(last_known_data: dict, days_to_predict: int = 30) -> list:
             'discount_amount': current_disc
         }])
         
-        # Predict tomorrow's sales
+        # Dynamic inference
         pred_val = model.predict(feature_row)[0]
-        pred_val = max(0.0, float(pred_val))  # Ensure non-negative
+        pred_val = max(0.0, float(pred_val))
         
         predictions.append({
             "date": pred_date.strftime("%Y-%m-%d"),
             "predicted_amount": round(pred_val, 2),
-            "confidence": round(float(95.0 - (i * 0.5)), 1)  # Confidence decays slightly over horizon
+            "confidence": round(float(95.0 - (i * 0.4)), 1)
         })
         
-        # Update lag states recursively
+        # update states recursively
         current_sales = pred_val
         rolling_sales.pop(0)
         rolling_sales.append(pred_val)

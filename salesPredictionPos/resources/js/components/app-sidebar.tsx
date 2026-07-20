@@ -15,6 +15,7 @@ import {
     Sparkles,
     Users,
     Wallet,
+    MessageCircle,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
@@ -57,6 +58,13 @@ const mainNavItems: ExtendedNavItem[] = [
         badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
     },
     {
+        title: 'AI Assistant',
+        href: '/ai-assistant',
+        icon: MessageCircle,
+        badge: 'NEW',
+        badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
+    },
+    {
         title: 'Products',
         href: '/products',
         icon: Package,
@@ -89,6 +97,7 @@ const mainNavItems: ExtendedNavItem[] = [
             { title: 'Payment Report', href: '/reports/payment-sales' },
             { title: 'Inventory Report', href: '/reports/inventory-sales' },
             { title: 'Profit Report', href: '/reports/profit-sales' },
+            { title: 'Expiry & Waste Report', href: '/reports/expiry-report' },
         ],
     },
     {

@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+use App\Models\InventoryBatch;
+
 class ProductController extends Controller
 {
     public function index(Request $request): Response
@@ -56,8 +58,12 @@ class ProductController extends Controller
             'cost' => 'required|numeric|min:0',
             'description' => 'nullable|string|max:1000',
             'is_active' => 'boolean',
+            'has_expiry' => 'boolean',
             'initial_stock' => 'nullable|integer|min:0',
             'low_stock_threshold' => 'nullable|integer|min:0',
+            'batch_number' => 'nullable|required_if:has_expiry,true|string|max:100',
+            'expiry_date' => 'nullable|required_if:has_expiry,true|date',
+            'manufacture_date' => 'nullable|date',
         ]);
 
         $product = Product::create($validated);
@@ -68,6 +74,19 @@ class ProductController extends Controller
             'quantity' => $validated['initial_stock'] ?? 0,
             'low_stock_threshold' => $validated['low_stock_threshold'] ?? 10,
         ]);
+
+        // Create initial batch if product expires and has stock
+        if ($product->has_expiry && ($validated['initial_stock'] ?? 0) > 0) {
+            InventoryBatch::create([
+                'product_id' => $product->id,
+                'batch_number' => $validated['batch_number'] ?? 'BATCH-INIT-' . now()->format('Ymd'),
+                'quantity' => $validated['initial_stock'],
+                'cost_price' => $product->cost,
+                'manufacture_date' => $validated['manufacture_date'] ?? null,
+                'expiry_date' => $validated['expiry_date'] ?? null,
+                'status' => 'active',
+            ]);
+        }
 
         AuditService::log('product_created', 'Product', $product->id, null, $validated);
 
@@ -94,6 +113,7 @@ class ProductController extends Controller
             'cost' => 'required|numeric|min:0',
             'description' => 'nullable|string|max:1000',
             'is_active' => 'boolean',
+            'has_expiry' => 'boolean',
         ]);
 
         $oldValues = $product->toArray();

@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\SalesPrediction;
+use App\Models\InventoryBatch;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -129,6 +130,7 @@ class DemoDataSeeder extends Seeder
         $categoryMap = Category::pluck('id', 'name');
 
         foreach ($products as $p) {
+            $hasExpiry = in_array($p['category'], ['Dairy', 'Bakery']);
             $product = Product::firstOrCreate(
                 ['sku' => $p['sku']],
                 [
@@ -138,17 +140,62 @@ class DemoDataSeeder extends Seeder
                     'price' => $p['price'],
                     'cost' => $p['cost'],
                     'is_active' => true,
+                    'has_expiry' => $hasExpiry,
                 ]
             );
 
             // Create inventory record with random stock
+            $qty = rand(40, 150);
             Inventory::firstOrCreate(
                 ['product_id' => $product->id],
                 [
-                    'quantity' => rand(5, 200),
+                    'quantity' => $qty,
                     'low_stock_threshold' => rand(5, 20),
                 ]
             );
+
+            // Create batches if product has expiry tracking
+            if ($hasExpiry) {
+                // Expired batch
+                InventoryBatch::create([
+                    'product_id' => $product->id,
+                    'batch_number' => 'B-' . $product->sku . '-EXP',
+                    'quantity' => 10,
+                    'cost_price' => $product->cost,
+                    'expiry_date' => Carbon::today()->subDays(rand(2, 8)),
+                    'status' => 'active',
+                ]);
+
+                // Expiring in 2 days
+                InventoryBatch::create([
+                    'product_id' => $product->id,
+                    'batch_number' => 'B-' . $product->sku . '-WARN1',
+                    'quantity' => 8,
+                    'cost_price' => $product->cost,
+                    'expiry_date' => Carbon::today()->addDays(rand(1, 2)),
+                    'status' => 'active',
+                ]);
+
+                // Expiring in 20 days
+                InventoryBatch::create([
+                    'product_id' => $product->id,
+                    'batch_number' => 'B-' . $product->sku . '-WARN2',
+                    'quantity' => 12,
+                    'cost_price' => $product->cost,
+                    'expiry_date' => Carbon::today()->addDays(rand(15, 25)),
+                    'status' => 'active',
+                ]);
+
+                // Safe batch (rest of stock)
+                InventoryBatch::create([
+                    'product_id' => $product->id,
+                    'batch_number' => 'B-' . $product->sku . '-SAFE',
+                    'quantity' => $qty - 30,
+                    'cost_price' => $product->cost,
+                    'expiry_date' => Carbon::today()->addDays(rand(60, 120)),
+                    'status' => 'active',
+                ]);
+            }
 
             // Initial stock-in movement
             InventoryMovement::create([
