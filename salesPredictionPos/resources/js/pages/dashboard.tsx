@@ -118,13 +118,28 @@ export default function Dashboard({ kpi, salesTrend = [], topProducts = [], cate
 
                 {/* Expiry Alerts Banner */}
                 {((kpi?.expiry_alerts?.total_alerts || 0) > 0) && (
-                    <div className="p-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 text-rose-700 dark:text-rose-400 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                        <AlertCircle className="size-5 text-rose-500 shrink-0 mt-0.5 sm:mt-0" />
-                        <div className="text-xs flex-1">
-                            <span className="font-bold">Inventory Risk Alert: </span>
-                            {kpi.expiry_alerts?.expired || 0} batches have already expired, and {kpi.expiry_alerts?.expiring_7_days || 0} batches are expiring in 7 days.
+                    <div className="p-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 text-rose-700 dark:text-rose-400 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-start md:items-center gap-3">
+                            <AlertCircle className="size-5 text-rose-500 shrink-0 mt-0.5 md:mt-0" />
+                            <div className="text-xs">
+                                <span className="font-bold block md:inline mb-1 md:mb-0 mr-2">Inventory Risk Alerts:</span>
+                                <div className="inline-flex flex-wrap gap-2">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white shadow-xs">
+                                        Expired: {kpi.expiry_alerts?.expired || 0}
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500 text-white shadow-xs">
+                                        Today: {kpi.expiry_alerts?.expiring_today || 0}
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white shadow-xs">
+                                        7 Days: {kpi.expiry_alerts?.expiring_7_days || 0}
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white shadow-xs">
+                                        30 Days: {kpi.expiry_alerts?.expiring_30_days || 0}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                        <Button size="sm" variant="ghost" asChild className="h-8 rounded-xl text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 self-end sm:self-auto shrink-0">
+                        <Button size="sm" variant="ghost" asChild className="h-8 rounded-xl text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 self-end md:self-auto shrink-0">
                             <Link href="/reports/expiry-report" className="font-bold text-[11px]">
                                 Resolve Batches &rarr;
                             </Link>

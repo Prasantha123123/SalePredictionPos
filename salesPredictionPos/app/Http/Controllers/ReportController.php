@@ -536,8 +536,10 @@ class ReportController extends Controller
         $lowStockCount = $products->filter(fn ($p) => ($p->inventory->quantity ?? 0) <= ($p->inventory->low_stock_threshold ?? 5) && ($p->inventory->quantity ?? 0) > 0)->count();
         $outOfStockCount = $products->filter(fn ($p) => ($p->inventory->quantity ?? 0) <= 0)->count();
 
-        $stockCostValue = $products->sum(fn ($p) => ($p->inventory->quantity ?? 0) * (float) $p->cost);
-        $stockRetailValue = $products->sum(fn ($p) => ($p->inventory->quantity ?? 0) * (float) $p->price);
+        // Calculate cost and retail valuation directly from active batches
+        $activeBatches = InventoryBatch::where('status', 'active')->get();
+        $stockCostValue = $activeBatches->sum(fn ($b) => $b->available_quantity * (float) $b->purchase_price);
+        $stockRetailValue = $activeBatches->sum(fn ($b) => $b->available_quantity * (float) $b->selling_price);
 
         $inventoryList = $products->map(fn ($p) => [
             'id' => $p->id,
@@ -580,11 +582,11 @@ class ReportController extends Controller
 
         $grossRevenue = (float) $sales->sum('total');
 
+        // Calculate COGS directly from the purchase prices recorded in sale items
         $cogs = (float) SaleItem::join('sales', 'sale_items.sale_id', '=', 'sales.id')
-            ->join('products', 'sale_items.product_id', '=', 'products.id')
             ->where('sales.status', 'completed')
             ->whereBetween('sales.created_at', [Carbon::parse($startDate)->startOfDay(), Carbon::parse($endDate)->endOfDay()])
-            ->sum(DB::raw('sale_items.quantity * COALESCE(products.cost, 0)'));
+            ->sum(DB::raw('sale_items.quantity * COALESCE(sale_items.purchase_price, 0)'));
 
         $operatingExpenses = (float) Expense::whereBetween('date', [$startDate, $endDate])->sum('amount');
 

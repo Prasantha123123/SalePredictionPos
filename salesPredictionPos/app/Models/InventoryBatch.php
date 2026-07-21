@@ -12,21 +12,27 @@ class InventoryBatch extends Model
 
     protected $fillable = [
         'product_id',
+        'supplier_id',
         'batch_number',
-        'quantity',
-        'cost_price',
+        'purchase_price',
+        'selling_price',
+        'quantity_received',
+        'available_quantity',
         'manufacture_date',
         'expiry_date',
-        'received_date',
+        'purchase_date',
+        'created_by',
         'status',
     ];
 
     protected $casts = [
-        'quantity' => 'integer',
-        'cost_price' => 'decimal:2',
+        'purchase_price' => 'decimal:2',
+        'selling_price' => 'decimal:2',
+        'quantity_received' => 'integer',
+        'available_quantity' => 'integer',
         'manufacture_date' => 'date',
         'expiry_date' => 'date',
-        'received_date' => 'date',
+        'purchase_date' => 'date',
     ];
 
     /**
@@ -35,5 +41,21 @@ class InventoryBatch extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * @return BelongsTo<Supplier, $this>
+     */
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

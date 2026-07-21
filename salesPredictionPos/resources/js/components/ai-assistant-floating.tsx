@@ -136,11 +136,10 @@ export default function AIAssistantFloating() {
                             const isUser = msg.role === 'user';
                             return (
                                 <div key={i} className={`flex gap-2 max-w-[85%] ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}>
-                                    <div className={`p-3 rounded-2xl border leading-relaxed relative ${
-                                        isUser
+                                    <div className={`p-3 rounded-2xl border leading-relaxed relative ${isUser
                                             ? 'bg-blue-600 text-white border-blue-700 rounded-tr-none'
                                             : 'bg-card text-foreground border-border/60 rounded-tl-none'
-                                    }`}>
+                                        }`}>
                                         <p className="whitespace-pre-line">{msg.content}</p>
                                     </div>
                                 </div>
@@ -189,11 +188,10 @@ export default function AIAssistantFloating() {
             {/* Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`size-12 rounded-full flex items-center justify-center text-white transition-all shadow-xl hover:scale-105 shrink-0 ${
-                    isOpen
+                className={`size-12 rounded-full flex items-center justify-center text-white transition-all shadow-xl hover:scale-105 shrink-0 ${isOpen
                         ? 'bg-rose-600 hover:bg-rose-500 rotate-90'
                         : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20'
-                }`}
+                    }`}
                 title="Toggle Live AI Helper"
             >
                 {isOpen ? <X className="size-5" /> : <MessageCircle className="size-5 animate-pulse" />}

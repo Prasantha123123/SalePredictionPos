@@ -33,7 +33,7 @@ class ContextBuilder
         // Inventory Staff get stock and expiry contexts
         if ($role === 'Inventory Staff') {
             $context .= "LOW STOCK COUNT: " . Inventory::whereColumn('quantity', '<=', 'low_stock_threshold')->count() . "\n";
-            $expired = InventoryBatch::where('status', 'active')->where('expiry_date', '<', Carbon::today())->sum('quantity');
+            $expired = InventoryBatch::where('status', 'active')->where('expiry_date', '<', Carbon::today())->sum('available_quantity');
             $context .= "EXPIRED ITEMS IN STOCK: " . (int)$expired . "\n";
             $context .= "Your access is focused on inventory status, shelf-life batches, and FEFO stock levels. You cannot view store profits, pricing cost fields, or cashier summaries.\n";
             return $context;
@@ -42,7 +42,7 @@ class ContextBuilder
         // Managers and Admins get full financial and prediction access
         $todaySales = Sale::whereDate('created_at', Carbon::today())->where('status', 'completed')->sum('total');
         $lowStock = Inventory::whereColumn('quantity', '<=', 'low_stock_threshold')->count();
-        $expired = InventoryBatch::where('status', 'active')->where('expiry_date', '<', Carbon::today())->sum('quantity');
+        $expired = InventoryBatch::where('status', 'active')->where('expiry_date', '<', Carbon::today())->sum('available_quantity');
         $customerCount = Customer::count();
 
         $tomorrowPrediction = SalesPrediction::where('prediction_date', Carbon::tomorrow())->latest()->first();

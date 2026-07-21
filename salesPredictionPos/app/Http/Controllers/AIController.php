@@ -17,17 +17,35 @@ class AIController extends Controller
      */
     public function chat(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'message' => 'required|string|max:1000',
-        ]);
+        // Extend execution time: fallback chain (gemma as last resort) can take up to 50s
+        set_time_limit(60);
 
-        $reply = $this->aiService->ask($validated['message']);
-        
-        return response()->json([
-            'status' => 'success',
-            'reply' => $reply,
-            'history' => $this->aiService->getHistory(),
-        ]);
+        try {
+            $validated = $request->validate([
+                'message' => 'required|string|max:1000',
+            ]);
+
+            $reply = $this->aiService->ask($validated['message']);
+
+            return response()->json([
+                'status' => 'success',
+                'reply' => $reply,
+                'history' => $this->aiService->getHistory(),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'reply' => 'Invalid message. Please enter a valid message (max 1000 characters).',
+                'history' => $this->aiService->getHistory(),
+            ], 422);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('AIController chat error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'reply' => 'An unexpected error occurred. Please try again.',
+                'history' => $this->aiService->getHistory(),
+            ], 500);
+        }
     }
 
     /**

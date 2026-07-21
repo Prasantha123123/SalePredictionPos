@@ -4,9 +4,12 @@ namespace App\Services;
 
 use App\Models\Discount;
 use App\Models\Inventory;
+use App\Models\InventoryBatch;
+use App\Models\InventoryMovement;
 use App\Models\Payment;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Services\AuditService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -21,7 +24,7 @@ class SaleService
      *
      * @param  array{
      *     customer_id?: int|null,
-     *     items: array<int, array{product_id: int, quantity: int, unit_price: float, discount?: float}>,
+     *     items: array<int, array{product_id: int, batch_id: int, quantity: int, unit_price: float, discount?: float}>,
      *     discount_code?: string|null,
      *     payment_method: string,
      *     notes?: string|null
@@ -72,27 +75,57 @@ class SaleService
                 'notes' => $data['notes'] ?? null,
             ]);
 
-            // Create sale items and update inventory
+            // Create sale items and deduct stock from chosen batch
             foreach ($data['items'] as $item) {
+                $batch = InventoryBatch::findOrFail($item['batch_id']);
+
+                if ($batch->product_id != $item['product_id']) {
+                    throw new \Exception("Batch {$batch->batch_number} does not belong to the selected product.");
+                }
+
+                if ($batch->available_quantity < $item['quantity']) {
+                    throw new \Exception("Insufficient stock in selected batch {$batch->batch_number}. Available: {$batch->available_quantity}, requested: {$item['quantity']}.");
+                }
+
+                // Deduct from the selected batch
+                $batch->decrement('available_quantity', $item['quantity']);
+                if ($batch->available_quantity <= 0) {
+                    $batch->update(['status' => 'depleted']);
+                }
+
+                // Log Inventory Movement
+                InventoryMovement::create([
+                    'product_id' => $item['product_id'],
+                    'type' => 'out',
+                    'quantity' => $item['quantity'],
+                    'reference' => "SALE-{$invoiceNumber}",
+                    'notes' => "Sold in invoice {$invoiceNumber} from batch {$batch->batch_number}",
+                    'user_id' => Auth::id(),
+                ]);
+
+                // Sync total stock cache in the inventory table
+                $totalStock = InventoryBatch::where('product_id', $item['product_id'])
+                    ->where('status', 'active')
+                    ->sum('available_quantity');
+                Inventory::where('product_id', $item['product_id'])->update(['quantity' => $totalStock]);
+
+                // Create Sale Item
                 $itemDiscount = $item['discount'] ?? 0;
-                $itemTotal = ($item['unit_price'] * $item['quantity']) - $itemDiscount;
+                $batchTotal = ($item['unit_price'] * $item['quantity']) - $itemDiscount;
+                $batchProfit = $batchTotal - ($batch->purchase_price * $item['quantity']);
 
                 SaleItem::create([
                     'sale_id' => $sale->id,
                     'product_id' => $item['product_id'],
+                    'batch_id' => $batch->id,
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
+                    'purchase_price' => $batch->purchase_price,
+                    'selling_price' => $batch->selling_price,
                     'discount' => $itemDiscount,
-                    'total' => $itemTotal,
+                    'total' => $batchTotal,
+                    'profit' => $batchProfit,
                 ]);
-
-                // Deduct from inventory
-                $this->inventoryService->removeStock(
-                    $item['product_id'],
-                    $item['quantity'],
-                    "SALE-{$invoiceNumber}",
-                    "Sold in invoice {$invoiceNumber}"
-                );
             }
 
             // Create payment record
@@ -144,6 +177,7 @@ class SaleService
                 SaleItem::create([
                     'sale_id' => $sale->id,
                     'product_id' => $item['product_id'],
+                    'batch_id' => $item['batch_id'] ?? null,
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
                     'discount' => $itemDiscount,
@@ -165,11 +199,12 @@ class SaleService
 
             // Restore inventory for each item
             foreach ($sale->items as $item) {
-                $this->inventoryService->addStock(
+                $this->inventoryService->restoreStock(
                     $item->product_id,
                     $item->quantity,
                     "VOID-{$sale->invoice_number}",
-                    "Voided from invoice {$sale->invoice_number}"
+                    "Voided from invoice {$sale->invoice_number}",
+                    $item->batch_id
                 );
             }
 

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Edit, Grid, LayoutList, Package, Plus, Save, Search, Trash2 } from 'lucide-react';
+import { Edit, Grid, LayoutList, Package, Plus, Save, Search, Trash2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +66,18 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
         expiry_date: '',
         manufacture_date: '',
     });
+
+    // Auto-generate batch number suggestion when SKU, has_expiry, or initial_stock changes
+    useEffect(() => {
+        if (!editingProduct && (data.has_expiry || parseInt(data.initial_stock) > 0) && !data.batch_number) {
+            suggestBatchNumber();
+        }
+    }, [data.has_expiry, data.initial_stock, data.sku]);
+
+    const suggestBatchNumber = () => {
+        const cleanSku = data.sku ? data.sku.replace(/\s+/g, '-').toUpperCase() : 'PROD';
+        setData('batch_number', `BAT-${cleanSku}-001`);
+    };
 
     const openCreateModal = () => {
         setEditingProduct(null);
@@ -449,33 +461,38 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
                                 </label>
                             </div>
 
-                            {data.has_expiry && !editingProduct && (
+                            {(data.has_expiry || parseInt(data.initial_stock) > 0) && !editingProduct && (
                                 <>
                                     <div className="space-y-1">
                                         <label className="text-xs font-semibold text-muted-foreground">Batch Number *</label>
-                                        <Input
-                                            type="text"
-                                            required={data.has_expiry}
-                                            placeholder="e.g. BATCH-001"
-                                            value={data.batch_number}
-                                            onChange={(e) => setData('batch_number', e.target.value)}
-                                            className="h-10 rounded-xl"
-                                        />
+                                        <div className="flex gap-2">
+                                            <Input
+                                                type="text"
+                                                required
+                                                placeholder="e.g. BATCH-001"
+                                                value={data.batch_number}
+                                                onChange={(e) => setData('batch_number', e.target.value)}
+                                                className="h-10 rounded-xl font-mono"
+                                            />
+                                            <button type="button" onClick={suggestBatchNumber} className="p-2 border border-input rounded-xl hover:bg-muted" title="Re-generate batch suggestion">
+                                                <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                                            </button>
+                                        </div>
                                         {errors.batch_number && <p className="text-[11px] text-destructive">{errors.batch_number}</p>}
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-xs font-semibold text-muted-foreground">Expiry Date *</label>
+                                        <label className="text-xs font-semibold text-muted-foreground">Expiry Date {data.has_expiry && '*'}</label>
                                         <Input
                                             type="date"
                                             required={data.has_expiry}
                                             value={data.expiry_date}
                                             onChange={(e) => setData('expiry_date', e.target.value)}
-                                            className="h-10 rounded-xl"
+                                            className="h-10 rounded-xl font-mono"
                                         />
                                         {errors.expiry_date && <p className="text-[11px] text-destructive">{errors.expiry_date}</p>}
                                     </div>
-
+                                    
                                     <div className="space-y-1 col-span-2">
                                         <label className="text-xs font-semibold text-muted-foreground">Manufacture Date</label>
                                         <Input

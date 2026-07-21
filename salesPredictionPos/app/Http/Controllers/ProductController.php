@@ -75,15 +75,27 @@ class ProductController extends Controller
             'low_stock_threshold' => $validated['low_stock_threshold'] ?? 10,
         ]);
 
-        // Create initial batch if product expires and has stock
-        if ($product->has_expiry && ($validated['initial_stock'] ?? 0) > 0) {
-            InventoryBatch::create([
+        // Create initial batch if product has stock
+        if (($validated['initial_stock'] ?? 0) > 0) {
+            $supplier = \App\Models\Supplier::first() ?: \App\Models\Supplier::create([
+                'company_name' => 'Default Supplier',
+                'supplier_name' => 'Default',
+                'phone' => '0000000000',
+            ]);
+
+            $cleanSku = str_replace(' ', '-', strtoupper($product->sku ?: 'PROD'));
+            \App\Models\InventoryBatch::create([
                 'product_id' => $product->id,
-                'batch_number' => $validated['batch_number'] ?? 'BATCH-INIT-' . now()->format('Ymd'),
-                'quantity' => $validated['initial_stock'],
-                'cost_price' => $product->cost,
+                'supplier_id' => $supplier->id,
+                'batch_number' => $validated['batch_number'] ?? "BAT-{$cleanSku}-001",
+                'purchase_price' => $product->cost,
+                'selling_price' => $product->price,
+                'quantity_received' => $validated['initial_stock'],
+                'available_quantity' => $validated['initial_stock'],
                 'manufacture_date' => $validated['manufacture_date'] ?? null,
                 'expiry_date' => $validated['expiry_date'] ?? null,
+                'purchase_date' => now()->format('Y-m-d'),
+                'created_by' => \Illuminate\Support\Facades\Auth::id(),
                 'status' => 'active',
             ]);
         }

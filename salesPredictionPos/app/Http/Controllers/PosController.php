@@ -9,6 +9,7 @@ use App\Models\Sale;
 use App\Services\SaleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,19 +25,41 @@ class PosController extends Controller
     public function index(): Response
     {
         return Inertia::render('pos', [
-            'products' => Product::with('category', 'inventory')
-                ->where('is_active', true)
-                ->get()
-                ->map(fn (Product $p) => [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'sku' => $p->sku,
-                    'price' => (float) $p->price,
-                    'category' => $p->category->name,
-                    'category_id' => $p->category_id,
-                    'stock' => $p->inventory?->quantity ?? 0,
-                    'image' => $p->image,
+            'products' => Product::with([
+                'category',
+                'inventory',
+                'batches' => function ($q) {
+                    $q->where('status', 'active')
+                      ->where('available_quantity', '>', 0)
+                      ->with('supplier')
+                      ->orderBy('expiry_date', 'asc')
+                      ->orderBy('purchase_date', 'asc');
+                }
+            ])
+            ->where('is_active', true)
+            ->get()
+            ->map(fn (Product $p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'sku' => $p->sku,
+                'price' => (float) $p->price,
+                'cost' => (float) $p->cost,
+                'category' => $p->category?->name ?? 'General',
+                'category_id' => $p->category_id,
+                'stock' => $p->inventory?->quantity ?? 0,
+                'image' => $p->image,
+                'has_expiry' => (bool) $p->has_expiry,
+                'batches' => $p->batches->map(fn ($b) => [
+                    'id' => $b->id,
+                    'batch_number' => $b->batch_number,
+                    'supplier_name' => $b->supplier?->company_name ?? 'Default Supplier',
+                    'purchase_price' => (float) $b->purchase_price,
+                    'selling_price' => (float) $b->selling_price,
+                    'expiry_date' => $b->expiry_date,
+                    'manufacture_date' => $b->manufacture_date,
+                    'available_quantity' => (int) $b->available_quantity,
                 ]),
+            ]),
             'categories' => Category::where('is_active', true)
                 ->select('id', 'name')
                 ->get(),
@@ -47,6 +70,7 @@ class PosController extends Controller
                 ->where('status', 'held')
                 ->latest()
                 ->get(),
+            'isAdmin' => Auth::user()->hasAnyRole(['Super Admin', 'Admin']),
         ]);
     }
 
@@ -59,6 +83,7 @@ class PosController extends Controller
             'customer_id' => 'nullable|exists:customers,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
+            'items.*.batch_id' => 'required|exists:inventory_batches,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0',
@@ -82,6 +107,7 @@ class PosController extends Controller
             'customer_id' => 'nullable|exists:customers,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
+            'items.*.batch_id' => 'nullable|exists:inventory_batches,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0',

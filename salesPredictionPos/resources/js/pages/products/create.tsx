@@ -1,6 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { Link } from '@inertiajs/react';
+import { useState, useEffect } from 'react';
 
 interface Category {
     id: number;
@@ -21,14 +22,32 @@ export default function ProductCreate({ categories }: Props) {
         cost: '',
         description: '',
         is_active: true,
+        has_expiry: false,
         initial_stock: '0',
         low_stock_threshold: '10',
+        batch_number: '',
+        expiry_date: '',
+        manufacture_date: '',
     });
+
+    // Auto-generate batch number suggestion when SKU changes or Initial Stock/Expiry is selected
+    useEffect(() => {
+        if ((data.has_expiry || parseInt(data.initial_stock) > 0) && !data.batch_number) {
+            suggestBatchNumber();
+        }
+    }, [data.has_expiry, data.initial_stock, data.sku]);
+
+    const suggestBatchNumber = () => {
+        const cleanSku = data.sku ? data.sku.replace(/\s+/g, '-').toUpperCase() : 'PROD';
+        setData('batch_number', `BAT-${cleanSku}-001`);
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         post('/products');
     };
+
+    const showBatchFields = data.has_expiry || parseInt(data.initial_stock) > 0;
 
     return (
         <>
@@ -75,6 +94,12 @@ export default function ProductCreate({ categories }: Props) {
                             </div>
 
                             <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Low Stock Threshold</label>
+                                <input type="number" value={data.low_stock_threshold} onChange={(e) => setData('low_stock_threshold', e.target.value)}
+                                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+                            </div>
+
+                            <div>
                                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Selling Price (Rs.) *</label>
                                 <input type="number" step="0.01" value={data.price} onChange={(e) => setData('price', e.target.value)}
                                     className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
@@ -94,11 +119,49 @@ export default function ProductCreate({ categories }: Props) {
                                     className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
                             </div>
 
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Low Stock Threshold</label>
-                                <input type="number" value={data.low_stock_threshold} onChange={(e) => setData('low_stock_threshold', e.target.value)}
-                                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+                            <div className="flex items-center gap-2 pt-6">
+                                <input type="checkbox" id="has_expiry" checked={data.has_expiry} onChange={(e) => setData('has_expiry', e.target.checked)}
+                                    className="h-4 w-4 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                                <label htmlFor="has_expiry" className="text-sm font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    Has Expiry Tracking
+                                </label>
                             </div>
+
+                            {/* Conditional Batch Fields (User visible and editable) */}
+                            {showBatchFields && (
+                                <div className="sm:col-span-2 grid gap-5 sm:grid-cols-2 p-4 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/20 dark:border-indigo-500/30 dark:bg-indigo-500/5 mt-2 animate-fadeIn">
+                                    <h3 className="sm:col-span-2 text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">
+                                        Initial Inventory Batch Configuration
+                                    </h3>
+
+                                    <div className="sm:col-span-2 relative">
+                                        <label className="mb-1 block text-xs font-bold text-gray-700 dark:text-gray-300">Batch Number *</label>
+                                        <div className="flex gap-2">
+                                            <input type="text" value={data.batch_number} onChange={(e) => setData('batch_number', e.target.value)}
+                                                className="w-full rounded-xl border border-gray-300 px-4 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white font-mono" />
+                                            <button type="button" onClick={suggestBatchNumber} className="p-2 border border-gray-300 rounded-xl hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800" title="Re-generate batch suggestion">
+                                                <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                                            </button>
+                                        </div>
+                                        {errors.batch_number && <p className="mt-1 text-xs text-red-500">{errors.batch_number}</p>}
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-1 block text-xs font-bold text-gray-700 dark:text-gray-300">Expiry Date {data.has_expiry && '*'}</label>
+                                        <input type="date" value={data.expiry_date} onChange={(e) => setData('expiry_date', e.target.value)}
+                                            className="w-full rounded-xl border border-gray-300 px-4 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white font-mono"
+                                            required={data.has_expiry} />
+                                        {errors.expiry_date && <p className="mt-1 text-xs text-red-500">{errors.expiry_date}</p>}
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-1 block text-xs font-bold text-gray-700 dark:text-gray-300">Manufacture Date</label>
+                                        <input type="date" value={data.manufacture_date} onChange={(e) => setData('manufacture_date', e.target.value)}
+                                            className="w-full rounded-xl border border-gray-300 px-4 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white font-mono" />
+                                        {errors.manufacture_date && <p className="mt-1 text-xs text-red-500">{errors.manufacture_date}</p>}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="sm:col-span-2">
                                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>

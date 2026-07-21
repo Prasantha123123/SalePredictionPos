@@ -127,6 +127,23 @@ class DemoDataSeeder extends Seeder
             ['name' => 'Cheese Slice (200g)', 'sku' => 'DRY-004', 'category' => 'Dairy', 'price' => 750, 'cost' => 580],
         ];
 
+        // Seed Suppliers
+        $suppliers = [
+            ['company_name' => 'Ceylon Tea & Beverage Exports', 'supplier_name' => 'Arjuna Ranatunga', 'phone' => '+94777111222', 'email' => 'arjuna@ceylontea.lk', 'district' => 'Colombo', 'city' => 'Colombo 03', 'status' => 'active'],
+            ['company_name' => 'Munchee Biscuit Distributors Ltd', 'supplier_name' => 'Suresh Perera', 'phone' => '+94777222333', 'email' => 'suresh@munchee.lk', 'district' => 'Gampaha', 'city' => 'Ja-Ela', 'status' => 'active'],
+            ['company_name' => 'Lanka Groceries Wholesale', 'supplier_name' => 'Mohamed Rizwan', 'phone' => '+94777333444', 'email' => 'rizwan@lankagrocery.lk', 'district' => 'Colombo', 'city' => 'Pettah', 'status' => 'active'],
+            ['company_name' => 'SL Dairy Farms & Curd Co', 'supplier_name' => 'Nisha Gunawardena', 'phone' => '+94777444555', 'email' => 'nisha@sldairy.lk', 'district' => 'Nuwara Eliya', 'city' => 'Ambewela', 'status' => 'active'],
+            ['company_name' => 'Household Essentials Sri Lanka', 'supplier_name' => 'Dilshan Silva', 'phone' => '+94777555666', 'email' => 'dilshan@household.lk', 'district' => 'Kalutara', 'city' => 'Panadura', 'status' => 'active'],
+        ];
+
+        $seededSuppliers = [];
+        foreach ($suppliers as $sup) {
+            $seededSuppliers[$sup['company_name']] = \App\Models\Supplier::create(array_merge($sup, [
+                'supplier_code' => \App\Models\Supplier::generateSupplierCode(),
+                'created_by' => $superAdmin->id,
+            ]));
+        }
+
         $categoryMap = Category::pluck('id', 'name');
 
         foreach ($products as $p) {
@@ -144,6 +161,20 @@ class DemoDataSeeder extends Seeder
                 ]
             );
 
+            // Determine appropriate supplier
+            $supplierName = 'Lanka Groceries Wholesale';
+            if ($p['category'] === 'Beverages') {
+                $supplierName = 'Ceylon Tea & Beverage Exports';
+            } elseif ($p['category'] === 'Snacks') {
+                $supplierName = 'Munchee Biscuit Distributors Ltd';
+            } elseif ($p['category'] === 'Dairy') {
+                $supplierName = 'SL Dairy Farms & Curd Co';
+            } elseif ($p['category'] === 'Household') {
+                $supplierName = 'Household Essentials Sri Lanka';
+            }
+            
+            $supplierId = $seededSuppliers[$supplierName]->id;
+
             // Create inventory record with random stock
             $qty = rand(40, 150);
             Inventory::firstOrCreate(
@@ -159,40 +190,74 @@ class DemoDataSeeder extends Seeder
                 // Expired batch
                 InventoryBatch::create([
                     'product_id' => $product->id,
+                    'supplier_id' => $supplierId,
                     'batch_number' => 'B-' . $product->sku . '-EXP',
-                    'quantity' => 10,
-                    'cost_price' => $product->cost,
+                    'purchase_price' => $product->cost,
+                    'selling_price' => $product->price,
+                    'quantity_received' => 10,
+                    'available_quantity' => 10,
                     'expiry_date' => Carbon::today()->subDays(rand(2, 8)),
+                    'purchase_date' => Carbon::today()->subDays(30),
+                    'created_by' => $admin->id,
                     'status' => 'active',
                 ]);
 
                 // Expiring in 2 days
                 InventoryBatch::create([
                     'product_id' => $product->id,
+                    'supplier_id' => $supplierId,
                     'batch_number' => 'B-' . $product->sku . '-WARN1',
-                    'quantity' => 8,
-                    'cost_price' => $product->cost,
+                    'purchase_price' => $product->cost,
+                    'selling_price' => $product->price,
+                    'quantity_received' => 8,
+                    'available_quantity' => 8,
                     'expiry_date' => Carbon::today()->addDays(rand(1, 2)),
+                    'purchase_date' => Carbon::today()->subDays(15),
+                    'created_by' => $admin->id,
                     'status' => 'active',
                 ]);
 
                 // Expiring in 20 days
                 InventoryBatch::create([
                     'product_id' => $product->id,
+                    'supplier_id' => $supplierId,
                     'batch_number' => 'B-' . $product->sku . '-WARN2',
-                    'quantity' => 12,
-                    'cost_price' => $product->cost,
+                    'purchase_price' => $product->cost,
+                    'selling_price' => $product->price,
+                    'quantity_received' => 12,
+                    'available_quantity' => 12,
                     'expiry_date' => Carbon::today()->addDays(rand(15, 25)),
+                    'purchase_date' => Carbon::today()->subDays(10),
+                    'created_by' => $admin->id,
                     'status' => 'active',
                 ]);
 
                 // Safe batch (rest of stock)
                 InventoryBatch::create([
                     'product_id' => $product->id,
+                    'supplier_id' => $supplierId,
                     'batch_number' => 'B-' . $product->sku . '-SAFE',
-                    'quantity' => $qty - 30,
-                    'cost_price' => $product->cost,
+                    'purchase_price' => $product->cost,
+                    'selling_price' => $product->price,
+                    'quantity_received' => $qty - 30,
+                    'available_quantity' => $qty - 30,
                     'expiry_date' => Carbon::today()->addDays(rand(60, 120)),
+                    'purchase_date' => Carbon::today()->subDays(2),
+                    'created_by' => $admin->id,
+                    'status' => 'active',
+                ]);
+            } else {
+                // Non-expiring products get a single active safe batch containing full inventory stock
+                InventoryBatch::create([
+                    'product_id' => $product->id,
+                    'supplier_id' => $supplierId,
+                    'batch_number' => 'B-' . $product->sku . '-SAFE',
+                    'purchase_price' => $product->cost,
+                    'selling_price' => $product->price,
+                    'quantity_received' => $qty,
+                    'available_quantity' => $qty,
+                    'purchase_date' => Carbon::today()->subDays(15),
+                    'created_by' => $admin->id,
                     'status' => 'active',
                 ]);
             }

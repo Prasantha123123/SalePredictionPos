@@ -16,6 +16,7 @@ import {
     Users,
     Wallet,
     MessageCircle,
+    Truck,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
@@ -78,6 +79,11 @@ const mainNavItems: ExtendedNavItem[] = [
         title: 'Customers',
         href: '/customers',
         icon: Users,
+    },
+    {
+        title: 'Suppliers',
+        href: '/suppliers',
+        icon: Truck,
     },
     {
         title: 'Expenses',

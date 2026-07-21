@@ -73,16 +73,23 @@ export default function AIAssistantPage() {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+                    'Accept': 'application/json',
                 },
                 body: JSON.stringify({ message: userMsg }),
             });
+
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                throw new Error('Server returned non-JSON response');
+            }
+
             const data = await response.json();
             if (data.status === 'success') {
                 setMessages(data.history);
             } else {
                 setMessages((prev) => [
                     ...prev,
-                    { role: 'assistant', content: '⚠️ Error: Encountered issues getting response from AI service.' }
+                    { role: 'assistant', content: data.reply || '⚠️ Error: Encountered issues getting response from AI service.' }
                 ]);
             }
         } catch (e) {
@@ -127,7 +134,7 @@ export default function AIAssistantPage() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `ai-assistant-conversation-${new Date().toISOString().slice(0,10)}.txt`;
+        a.download = `ai-assistant-conversation-${new Date().toISOString().slice(0, 10)}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -187,11 +194,10 @@ export default function AIAssistantPage() {
                                     {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
                                 </div>
                                 <div className="space-y-1">
-                                    <div className={`p-4 rounded-2xl text-xs leading-relaxed border shadow-xs relative group ${
-                                        isUser
+                                    <div className={`p-4 rounded-2xl text-xs leading-relaxed border shadow-xs relative group ${isUser
                                             ? 'bg-blue-600 text-white border-blue-700 rounded-tr-none'
                                             : 'bg-card text-foreground border-border/60 rounded-tl-none'
-                                    }`}>
+                                        }`}>
                                         {/* Content formatted with basic custom markdown/newlines */}
                                         <div className="whitespace-pre-line prose prose-xs dark:prose-invert">
                                             {msg.content}

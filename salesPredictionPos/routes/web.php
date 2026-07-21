@@ -10,6 +10,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AIController;
+use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -50,6 +51,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('inventory/adjust', [InventoryController::class, 'adjust'])
         ->middleware('can:manage-inventory')
         ->name('inventory.adjust');
+    Route::put('inventory/batches/{batch}', [InventoryController::class, 'updateBatch'])
+        ->middleware('can:manage-inventory')
+        ->name('inventory.batches.update');
 
     // Customers
     Route::resource('customers', CustomerController::class)
@@ -58,6 +62,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Expenses
     Route::resource('expenses', ExpenseController::class)
         ->middleware('can:manage-expenses');
+
+    // Suppliers
+    Route::middleware('can:view-suppliers')->group(function () {
+        Route::get('suppliers/dropdown', [SupplierController::class, 'dropdown'])->name('suppliers.dropdown');
+        Route::get('suppliers/stats', [SupplierController::class, 'stats'])->name('suppliers.stats');
+        Route::get('suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
+        Route::get('suppliers/{supplier}', [SupplierController::class, 'show'])->name('suppliers.show');
+    });
+
+    Route::middleware('can:manage-suppliers')->group(function () {
+        Route::post('suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
+        Route::put('suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update');
+        Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
+    });
 
     // Reports & Analytics Suite
     Route::get('reports', [ReportController::class, 'index'])

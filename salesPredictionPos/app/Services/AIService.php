@@ -7,6 +7,7 @@ use App\Services\ContextBuilder;
 use App\Services\PromptBuilder;
 use App\Services\RecommendationService;
 use App\Services\GeminiService;
+use App\Services\GroqService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -17,7 +18,8 @@ class AIService
         protected ContextBuilder $contextBuilder,
         protected PromptBuilder $promptBuilder,
         protected RecommendationService $recommendationService,
-        protected GeminiService $geminiService
+        protected GeminiService $geminiService,
+        protected GroqService $groqService
     ) {}
 
     /**
@@ -59,25 +61,48 @@ class AIService
             return $cachedResponse;
         }
 
-        // 1. Context Construction
-        $context = $this->contextBuilder->build($primaryRole);
+        try {
+            // 1. Context Construction
+            $context = $this->contextBuilder->build($primaryRole);
 
-        // 2. System Prompt construction
-        $systemPrompt = $this->promptBuilder->build($primaryRole, $user->name, $context);
+            // 2. System Prompt construction
+            $systemPrompt = $this->promptBuilder->build($primaryRole, $user->name, $context);
 
-        // 3. Check if Gemini key is set, else use fallback mock responses
-        $apiKey = config('services.gemini.key', env('GEMINI_API_KEY', ''));
+            // 3. Dispatch to AI Services (Groq -> Gemini -> Offline Fallback)
+            $history = $this->conversationManager->getHistory();
+            $reply = null;
+            $lastError = null;
 
-        if (empty($apiKey)) {
-            $reply = $this->mockAiFallback($message, $primaryRole, $context);
-        } else {
-            try {
-                $history = $this->conversationManager->getHistory();
-                $reply = $this->geminiService->generateContent($systemPrompt, $history, $message);
-            } catch (\Exception $e) {
-                Log::error('AIService Gemini request error: ' . $e->getMessage());
-                $reply = $this->mockAiFallback($message, $primaryRole, $context);
+            // Attempt Groq first if configured (ultra-fast Llama 3.3)
+            if ($this->groqService->isConfigured()) {
+                try {
+                    $reply = $this->groqService->generateContent($systemPrompt, $history, $message);
+                } catch (\Exception $e) {
+                    Log::error('AIService Groq request error: ' . $e->getMessage());
+                    $lastError = $e->getMessage();
+                }
             }
+
+            // Attempt Gemini if Groq was not configured or failed
+            if ($reply === null) {
+                $geminiKey = config('services.gemini.key', env('GEMINI_API_KEY', ''));
+                if (! empty($geminiKey)) {
+                    try {
+                        $reply = $this->geminiService->generateContent($systemPrompt, $history, $message);
+                    } catch (\Exception $e) {
+                        Log::error('AIService Gemini request error: ' . $e->getMessage());
+                        $lastError = $e->getMessage();
+                    }
+                }
+            }
+
+            // Fallback to offline mock response if both failed or no keys configured
+            if ($reply === null) {
+                $reply = $this->mockAiFallback($message, $primaryRole, $context, $lastError);
+            }
+        } catch (\Exception $e) {
+            Log::error('AIService context building error: ' . $e->getMessage());
+            $reply = $this->mockAiFallback($message, $primaryRole, '', $e->getMessage());
         }
 
         // Save conversation context
@@ -93,7 +118,7 @@ class AIService
     /**
      * Rule-based fallback bot when Gemini API is not configured.
      */
-    protected function mockAiFallback(string $message, string $role, string $context): string
+    protected function mockAiFallback(string $message, string $role, string $context, ?string $apiError = null): string
     {
         $msgLower = strtolower($message);
 
@@ -157,9 +182,11 @@ class AIService
             return "### ⏳ Stock Expirations\nDairy and Bakery products are tracked via **FEFO (First Expiring First Out)** logic. \n- Check the **Expiry & Waste Report** from the sidebar dropdown to see expired items and days remaining.";
         }
 
+        // Generic welcome — show API error details if available
+        if ($apiError) {
+            return "👋 **Hello! I am your Smart POS AI Assistant.**\n\nI am currently running in **Offline Fallback Mode** because your configured `GEMINI_API_KEY` returned an error:\n> ⚠️ *{$apiError}*\n\nWhile this error persists, I can assist you with:\n- Operations guides (creating products, sales, suppliers)\n- Explaining forecast reports and accuracy metrics (MAPE/RMSE)\n- Reordering stock and tracking product expiry warnings";
+        }
 
-
-        // Generic welcome
         return "👋 **Hello! I am your Smart POS AI Assistant.**\n\nI can assist you with:\n- Operations guides (creating products, sales, suppliers)\n- Explaining forecast reports and accuracy metrics (MAPE/RMSE)\n- Reordering stock and tracking product expiry warnings\n\n*Note: Add `GEMINI_API_KEY` to your `.env` file to unlock live conversation and customized analytics using Google Gemini 2.5 Flash!*";
     }
 }

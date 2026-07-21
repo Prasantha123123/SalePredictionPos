@@ -21,6 +21,7 @@ import {
     UserPlus,
     X,
     Zap,
+    AlertTriangle,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,15 +31,29 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import AppLayout from '@/layouts/app-layout';
 
+interface Batch {
+    id: number;
+    batch_number: string;
+    supplier_name: string;
+    purchase_price: number;
+    selling_price: number;
+    expiry_date: string | null;
+    manufacture_date: string | null;
+    available_quantity: number;
+}
+
 interface Product {
     id: number;
     name: string;
     sku: string;
     price: number;
+    cost: number;
     category: string;
     category_id: number;
     stock: number;
     image: string | null;
+    has_expiry: boolean;
+    batches: Batch[];
 }
 
 interface Category {
@@ -54,6 +69,7 @@ interface Customer {
 
 interface CartItem {
     product: Product;
+    batch: Batch;
     quantity: number;
     discount: number;
 }
@@ -62,7 +78,7 @@ interface HeldOrder {
     id: number;
     invoice_number: string;
     total: number;
-    items: { product: Product; quantity: number; unit_price: number }[];
+    items: { product: Product; quantity: number; unit_price: number; batch_id?: number }[];
 }
 
 interface Props {
@@ -70,13 +86,14 @@ interface Props {
     categories: Category[];
     customers: Customer[];
     heldOrders: HeldOrder[];
+    isAdmin: boolean;
 }
 
 function formatCurrency(amount: number) {
     return `Rs. ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
 }
 
-export default function Pos({ products = [], categories = [], customers = [], heldOrders = [] }: Props) {
+export default function Pos({ products = [], categories = [], customers = [], heldOrders = [], isAdmin }: Props) {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeCategory, setActiveCategory] = useState<number | null>(null);
@@ -88,7 +105,6 @@ export default function Pos({ products = [], categories = [], customers = [], he
 
     // Order modifiers
     const [orderDiscountPercent, setOrderDiscountPercent] = useState(0);
-    const [taxRatePercent, setTaxRatePercent] = useState(8);
 
     // Checkout & Receipt Modal
     const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
@@ -97,7 +113,34 @@ export default function Pos({ products = [], categories = [], customers = [], he
     const [lastCompletedSale, setLastCompletedSale] = useState<any | null>(null);
     const [receiptModalOpen, setReceiptModalOpen] = useState(false);
 
+    // Batch Selection Modal state
+    const [selectedProductForBatch, setSelectedProductForBatch] = useState<Product | null>(null);
+    const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+    const [batchSearchQuery, setBatchSearchQuery] = useState('');
+
     const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Helper functions for expiry checks
+    const getDaysRemaining = useCallback((expiryDateStr: string | null) => {
+        if (!expiryDateStr) return null;
+        const diffTime = new Date(expiryDateStr).getTime() - new Date().getTime();
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }, []);
+
+    const getExpiryBadge = useCallback((expiryDateStr: string | null) => {
+        if (!expiryDateStr) {
+            return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-bold rounded-full text-[9px]">Healthy</Badge>;
+        }
+        const days = getDaysRemaining(expiryDateStr);
+        if (days === null) return null;
+        if (days < 0) {
+            return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/20 font-extrabold rounded-full text-[9px]">Expired</Badge>;
+        }
+        if (days <= 7) {
+            return <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20 font-extrabold rounded-full text-[9px]">Expiring Soon</Badge>;
+        }
+        return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-bold rounded-full text-[9px]">Healthy</Badge>;
+    }, [getDaysRemaining]);
 
     // Filter products
     const filteredProducts = useMemo(() => {
@@ -124,56 +167,106 @@ export default function Pos({ products = [], categories = [], customers = [], he
 
     // Cart calculations
     const rawSubtotal = useMemo(() => {
-        return cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+        return cart.reduce((sum, item) => sum + item.batch.selling_price * item.quantity, 0);
     }, [cart]);
 
     const discountAmount = useMemo(() => {
         return (rawSubtotal * orderDiscountPercent) / 100;
     }, [rawSubtotal, orderDiscountPercent]);
 
-    const taxAmount = useMemo(() => {
-        return ((rawSubtotal - discountAmount) * taxRatePercent) / 100;
-    }, [rawSubtotal, discountAmount, taxRatePercent]);
+    const taxAmount = 0;
 
     const grandTotal = useMemo(() => {
-        return Math.max(0, rawSubtotal - discountAmount + taxAmount);
-    }, [rawSubtotal, discountAmount, taxAmount]);
+        return Math.max(0, rawSubtotal - discountAmount);
+    }, [rawSubtotal, discountAmount]);
 
     const changeDue = useMemo(() => {
         const tendered = parseFloat(amountTendered) || 0;
         return Math.max(0, tendered - grandTotal);
     }, [amountTendered, grandTotal]);
 
-    const addToCart = useCallback((product: Product) => {
+    const addToCart = useCallback((product: Product, batch: Batch) => {
         setCart((prev) => {
-            const existing = prev.find((item) => item.product.id === product.id);
+            const existing = prev.find(
+                (item) => item.product.id === product.id && item.batch.id === batch.id
+            );
             if (existing) {
-                if (existing.quantity >= product.stock) return prev;
+                if (existing.quantity >= batch.available_quantity) {
+                    alert(`Insufficient stock in selected batch ${batch.batch_number}. Maximum available: ${batch.available_quantity}`);
+                    return prev;
+                }
                 return prev.map((item) =>
-                    item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+                    item.product.id === product.id && item.batch.id === batch.id
+                        ? { ...item, quantity: item.quantity + 1 }
+                        : item
                 );
             }
-            if (product.stock <= 0) return prev;
-            return [...prev, { product, quantity: 1, discount: 0 }];
+            if (batch.available_quantity <= 0) {
+                alert(`Selected batch ${batch.batch_number} has zero stock.`);
+                return prev;
+            }
+            return [...prev, { product, batch, quantity: 1, discount: 0 }];
         });
     }, []);
 
-    const updateQuantity = useCallback((productId: number, delta: number) => {
+    const handleProductClick = useCallback((product: Product) => {
+        if (!product.batches || product.batches.length === 0) {
+            alert(`No active batches available for product ${product.name}`);
+            return;
+        }
+
+        if (product.batches.length === 1) {
+            // Auto select single batch
+            addToCart(product, product.batches[0]);
+        } else {
+            // Open batch selection popup
+            setSelectedProductForBatch(product);
+            setBatchSearchQuery('');
+            setIsBatchModalOpen(true);
+        }
+    }, [addToCart]);
+
+    const handleSelectBatch = (batch: Batch) => {
+        if (!selectedProductForBatch) return;
+
+        const days = getDaysRemaining(batch.expiry_date);
+        const isExpired = days !== null && days < 0;
+
+        if (isExpired && !isAdmin) {
+            alert("This batch is expired. Only administrators can override and sell from expired batches.");
+            return;
+        }
+
+        if (isExpired && isAdmin) {
+            if (!confirm(`Warning: Batch ${batch.batch_number} has expired! Do you want to override and continue?`)) {
+                return;
+            }
+        }
+
+        addToCart(selectedProductForBatch, batch);
+        setIsBatchModalOpen(false);
+        setSelectedProductForBatch(null);
+    };
+
+    const updateQuantity = useCallback((productId: number, batchId: number, delta: number) => {
         setCart((prev) =>
             prev
                 .map((item) => {
-                    if (item.product.id !== productId) return item;
+                    if (item.product.id !== productId || item.batch.id !== batchId) return item;
                     const newQty = item.quantity + delta;
                     if (newQty <= 0) return null;
-                    if (newQty > item.product.stock) return item;
+                    if (newQty > item.batch.available_quantity) {
+                        alert(`Insufficient stock in selected batch ${item.batch.batch_number}. Maximum available: ${item.batch.available_quantity}`);
+                        return item;
+                    }
                     return { ...item, quantity: newQty };
                 })
                 .filter(Boolean) as CartItem[]
         );
     }, []);
 
-    const removeFromCart = useCallback((productId: number) => {
-        setCart((prev) => prev.filter((item) => item.product.id !== productId));
+    const removeFromCart = useCallback((productId: number, batchId: number) => {
+        setCart((prev) => prev.filter((item) => item.product.id !== productId || item.batch.id !== batchId));
     }, []);
 
     const clearCart = useCallback(() => {
@@ -187,7 +280,7 @@ export default function Pos({ products = [], categories = [], customers = [], he
     const handleSimulateBarcode = () => {
         if (products.length > 0) {
             const randomProduct = products[Math.floor(Math.random() * products.length)];
-            addToCart(randomProduct);
+            handleProductClick(randomProduct);
         }
     };
 
@@ -217,8 +310,9 @@ export default function Pos({ products = [], categories = [], customers = [], he
             customer_id: selectedCustomer,
             items: cart.map((item) => ({
                 product_id: item.product.id,
+                batch_id: item.batch.id,
                 quantity: item.quantity,
-                unit_price: item.product.price,
+                unit_price: item.batch.selling_price,
                 discount: item.discount,
             })),
             payment_method: selectedPaymentMethod,
@@ -266,8 +360,9 @@ export default function Pos({ products = [], categories = [], customers = [], he
                 customer_id: selectedCustomer,
                 items: cart.map((item) => ({
                     product_id: item.product.id,
+                    batch_id: item.batch.id,
                     quantity: item.quantity,
-                    unit_price: item.product.price,
+                    unit_price: item.batch.selling_price,
                     discount: item.discount,
                 })),
             },
@@ -283,11 +378,25 @@ export default function Pos({ products = [], categories = [], customers = [], he
 
     const resumeOrder = useCallback(
         (order: HeldOrder) => {
-            const restoredCart: CartItem[] = order.items.map((item) => ({
-                product: products.find((p) => p.id === item.product.id) || (item.product as Product),
-                quantity: item.quantity,
-                discount: 0,
-            }));
+            const restoredCart: CartItem[] = order.items.map((item: any) => {
+                const prod = products.find((p) => p.id === item.product_id);
+                const batch = prod?.batches?.find((b) => b.id === item.batch_id) || prod?.batches?.[0] || {
+                    id: item.batch_id || 0,
+                    batch_number: 'N/A',
+                    supplier_name: 'Unknown',
+                    purchase_price: item.unit_price,
+                    selling_price: item.unit_price,
+                    expiry_date: null,
+                    manufacture_date: null,
+                    available_quantity: 999,
+                };
+                return {
+                    product: prod || { id: item.product_id, name: item.product?.name || 'Item', sku: '', price: item.unit_price, cost: item.unit_price, category: '', category_id: 0, stock: 999, image: null, has_expiry: false, batches: [] },
+                    batch,
+                    quantity: item.quantity,
+                    discount: item.discount || 0,
+                };
+            });
             setCart(restoredCart);
             setShowHeldOrders(false);
             router.post(`/pos/${order.id}/void`);
@@ -296,6 +405,17 @@ export default function Pos({ products = [], categories = [], customers = [], he
     );
 
     const selectedCustomerData = customers.find((c) => c.id === selectedCustomer);
+
+    const filteredBatches = useMemo(() => {
+        if (!selectedProductForBatch || !selectedProductForBatch.batches) return [];
+        if (!batchSearchQuery) return selectedProductForBatch.batches;
+        const q = batchSearchQuery.toLowerCase();
+        return selectedProductForBatch.batches.filter(
+            (b) =>
+                b.batch_number.toLowerCase().includes(q) ||
+                b.supplier_name.toLowerCase().includes(q)
+        );
+    }, [selectedProductForBatch, batchSearchQuery]);
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Smart POS Terminal', href: '/pos' }]}>
@@ -345,7 +465,7 @@ export default function Pos({ products = [], categories = [], customers = [], he
                                     activeCategory === null
                                         ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                                         : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
-                                }`}
+                                    }`}
                             >
                                 All Products ({products.length})
                             </button>
@@ -369,7 +489,9 @@ export default function Pos({ products = [], categories = [], customers = [], he
                     <div className="flex-1 overflow-y-auto p-4">
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
                             {filteredProducts.map((product) => {
-                                const inCart = cart.find((item) => item.product.id === product.id);
+                                const inCartQty = cart
+                                    .filter((item) => item.product.id === product.id)
+                                    .reduce((sum, item) => sum + item.quantity, 0);
                                 const isLowStock = product.stock <= 5 && product.stock > 0;
                                 const isOutOfStock = product.stock <= 0;
 
@@ -378,17 +500,17 @@ export default function Pos({ products = [], categories = [], customers = [], he
                                         key={product.id}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.97 }}
-                                        onClick={() => addToCart(product)}
+                                        onClick={() => handleProductClick(product)}
                                         disabled={isOutOfStock}
                                         className={`relative group flex flex-col justify-between p-3.5 rounded-2xl border text-left transition-all shadow-xs ${
-                                            inCart
+                                            inCartQty > 0
                                                 ? 'bg-blue-500/10 border-blue-500/50 ring-2 ring-blue-500/20'
                                                 : 'bg-card border-border/60 hover:border-blue-500/40 hover:shadow-md'
                                         } ${isOutOfStock ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                                     >
-                                        {inCart && (
-                                            <span className="absolute -top-2 -right-2 size-6 rounded-full bg-blue-600 text-white text-[11px] font-extrabold flex items-center justify-center shadow-md animate-bounce">
-                                                {inCart.quantity}
+                                        {inCartQty > 0 && (
+                                            <span className="absolute -top-2 -right-2 size-6 rounded-full bg-blue-600 text-white text-[11px] font-extrabold flex items-center justify-center shadow-md">
+                                                {inCartQty}
                                             </span>
                                         )}
 
@@ -436,7 +558,7 @@ export default function Pos({ products = [], categories = [], customers = [], he
                 </div>
 
                 {/* RIGHT COLUMN: Interactive Cart & Checkout Panel */}
-                <div className="w-full lg:w-[420px] flex flex-col bg-card border-l border-border/60 shrink-0">
+                <div className="w-full lg:w-[420px] flex flex-col bg-card border-l border-border/60 shrink-0 text-xs">
                     {/* Cart Header */}
                     <div className="p-4 border-b border-border/60 flex items-center justify-between bg-muted/20">
                         <div className="flex items-center gap-2.5">
@@ -445,7 +567,7 @@ export default function Pos({ products = [], categories = [], customers = [], he
                             </div>
                             <div>
                                 <h2 className="text-xs font-bold text-foreground">Cart Order Summary</h2>
-                                <p className="text-[10px] text-muted-foreground">{cart.length} unique items added</p>
+                                <p className="text-[10px] text-muted-foreground">{cart.length} items in cart</p>
                             </div>
                         </div>
 
@@ -549,46 +671,54 @@ export default function Pos({ products = [], categories = [], customers = [], he
                                 </div>
                                 <p className="text-xs font-semibold text-muted-foreground">Cart is empty</p>
                                 <p className="text-[11px] text-muted-foreground/70 max-w-[200px]">
-                                    Click products from the catalog or press F2 to scan barcodes.
+                                    Click products from the catalog to select batches.
                                 </p>
                             </div>
                         ) : (
                             <AnimatePresence>
                                 {cart.map((item) => (
                                     <motion.div
-                                        key={item.product.id}
+                                        key={`${item.product.id}-${item.batch.id}`}
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, scale: 0.95 }}
                                         className="p-3 rounded-2xl bg-muted/30 border border-border/60 flex items-center justify-between gap-3 group hover:border-border transition-all"
                                     >
-                                        <div className="flex-1 min-w-0">
+                                        <div className="flex-1 min-w-0 space-y-0.5">
                                             <p className="text-xs font-bold text-foreground truncate">{item.product.name}</p>
-                                            <p className="text-[10px] text-muted-foreground">{formatCurrency(item.product.price)} each</p>
+                                            <div className="flex flex-wrap gap-1">
+                                                <span className="px-1.5 py-0.2 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-mono text-[9px] rounded font-bold">
+                                                    Batch: {item.batch.batch_number}
+                                                </span>
+                                                <span className="px-1.5 py-0.2 bg-muted text-muted-foreground text-[9px] rounded">
+                                                    {item.batch.supplier_name}
+                                                </span>
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground">{formatCurrency(item.batch.selling_price)} each</p>
                                         </div>
 
-                                        <div className="flex items-center gap-1.5 bg-background border border-border/80 rounded-xl p-1">
+                                        <div className="flex items-center gap-1 bg-background border border-border/80 rounded-xl p-1 shrink-0">
                                             <button
-                                                onClick={() => updateQuantity(item.product.id, -1)}
-                                                className="size-6 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center text-foreground"
+                                                onClick={() => updateQuantity(item.product.id, item.batch.id, -1)}
+                                                className="size-5.5 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center text-foreground"
                                             >
                                                 <Minus className="size-3" />
                                             </button>
-                                            <span className="w-6 text-center text-xs font-bold">{item.quantity}</span>
+                                            <span className="w-5 text-center text-xs font-bold font-mono">{item.quantity}</span>
                                             <button
-                                                onClick={() => updateQuantity(item.product.id, 1)}
-                                                className="size-6 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center text-foreground"
+                                                onClick={() => updateQuantity(item.product.id, item.batch.id, 1)}
+                                                className="size-5.5 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center text-foreground"
                                             >
                                                 <Plus className="size-3" />
                                             </button>
                                         </div>
 
-                                        <div className="text-right">
-                                            <p className="text-xs font-black text-foreground">
-                                                {formatCurrency(item.product.price * item.quantity)}
+                                        <div className="text-right shrink-0">
+                                            <p className="text-xs font-black text-foreground font-mono">
+                                                {formatCurrency(item.batch.selling_price * item.quantity)}
                                             </p>
                                             <button
-                                                onClick={() => removeFromCart(item.product.id)}
+                                                onClick={() => removeFromCart(item.product.id, item.batch.id)}
                                                 className="text-muted-foreground hover:text-destructive text-[10px] transition-colors"
                                             >
                                                 Remove
@@ -602,49 +732,32 @@ export default function Pos({ products = [], categories = [], customers = [], he
 
                     {/* Order Modifiers & Total Section */}
                     <div className="p-4 border-t border-border/60 bg-muted/20 space-y-3">
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Discount %</label>
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={orderDiscountPercent}
-                                    onChange={(e) => setOrderDiscountPercent(Math.max(0, Math.min(100, Number(e.target.value))))}
-                                    className="h-8 text-xs rounded-xl bg-background"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Tax Rate %</label>
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    max="30"
-                                    value={taxRatePercent}
-                                    onChange={(e) => setTaxRatePercent(Math.max(0, Number(e.target.value)))}
-                                    className="h-8 text-xs rounded-xl bg-background"
-                                />
-                            </div>
+                        <div className="text-xs">
+                            <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Discount %</label>
+                            <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={orderDiscountPercent}
+                                onChange={(e) => setOrderDiscountPercent(Math.max(0, Math.min(100, Number(e.target.value))))}
+                                className="h-8 text-xs rounded-xl bg-background font-mono animate-fadeIn"
+                            />
                         </div>
 
                         <div className="space-y-1.5 text-xs pt-1 border-t border-border/40">
                             <div className="flex justify-between text-muted-foreground">
                                 <span>Subtotal</span>
-                                <span className="font-semibold">{formatCurrency(rawSubtotal)}</span>
+                                <span className="font-semibold font-mono">{formatCurrency(rawSubtotal)}</span>
                             </div>
                             {discountAmount > 0 && (
                                 <div className="flex justify-between text-emerald-600">
                                     <span>Discount ({orderDiscountPercent}%)</span>
-                                    <span className="font-semibold">-{formatCurrency(discountAmount)}</span>
+                                    <span className="font-semibold font-mono">-{formatCurrency(discountAmount)}</span>
                                 </div>
                             )}
-                            <div className="flex justify-between text-muted-foreground">
-                                <span>Tax ({taxRatePercent}%)</span>
-                                <span className="font-semibold">+{formatCurrency(taxAmount)}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-base pt-2 border-t border-border/60">
+                            <div className="flex justify-between items-center text-base pt-2 border-t border-border/60 font-bold">
                                 <span className="font-black text-foreground">Total Due</span>
-                                <span className="font-black text-blue-600 dark:text-blue-400 text-lg">
+                                <span className="font-black text-blue-600 dark:text-blue-400 text-lg font-mono">
                                     {formatCurrency(grandTotal)}
                                 </span>
                             </div>
@@ -672,6 +785,104 @@ export default function Pos({ products = [], categories = [], customers = [], he
                 </div>
             </div>
 
+            {/* BATCH SELECTION DIALOG */}
+            <Dialog open={isBatchModalOpen} onOpenChange={setIsBatchModalOpen}>
+                <DialogContent className="sm:max-w-4xl rounded-2xl p-6 text-xs max-h-[90vh] overflow-hidden flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="text-base font-bold flex items-center justify-between">
+                            <span>Select Product Batch</span>
+                            {selectedProductForBatch && (
+                                <span className="text-xs font-normal text-muted-foreground">
+                                    {selectedProductForBatch.name} (SKU: {selectedProductForBatch.sku})
+                                </span>
+                            )}
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    {selectedProductForBatch && (
+                        <div className="flex-1 overflow-hidden flex flex-col gap-4 mt-2">
+                            {/* Search field for batches */}
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search by batch number or supplier..."
+                                    value={batchSearchQuery}
+                                    onChange={(e) => setBatchSearchQuery(e.target.value)}
+                                    className="pl-9 h-9.5 rounded-xl text-xs"
+                                />
+                            </div>
+
+                            {/* Batches Table list */}
+                            <div className="flex-1 overflow-y-auto border border-border/60 rounded-xl bg-card">
+                                <table className="w-full text-[11px] text-left">
+                                    <thead>
+                                        <tr className="bg-muted/40 border-b border-border/60 font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
+                                            <th className="px-4 py-3">Batch Number</th>
+                                            <th className="px-4 py-3">Supplier</th>
+                                            <th className="px-4 py-3 text-right">Cost (Wholesale)</th>
+                                            <th className="px-4 py-3 text-right">Retail (Selling)</th>
+                                            <th className="px-4 py-3">Expiry Date</th>
+                                            <th className="px-4 py-3 text-center">Days Left</th>
+                                            <th className="px-4 py-3 text-right">Stock</th>
+                                            <th className="px-4 py-3 text-center">Status</th>
+                                            <th className="px-4 py-3 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/40">
+                                        {filteredBatches.length > 0 ? (
+                                            filteredBatches.map((b) => {
+                                                const daysLeft = getDaysRemaining(b.expiry_date);
+                                                const isExpired = daysLeft !== null && daysLeft < 0;
+
+                                                return (
+                                                    <tr key={b.id} className={`hover:bg-muted/30 transition-colors ${isExpired ? 'bg-rose-500/5 text-rose-800 dark:text-rose-300' : ''}`}>
+                                                        <td className="px-4 py-3 font-mono font-bold">{b.batch_number}</td>
+                                                        <td className="px-4 py-3 font-medium">{b.supplier_name}</td>
+                                                        <td className="px-4 py-3 text-right font-mono">Rs. {b.purchase_price.toFixed(2)}</td>
+                                                        <td className="px-4 py-3 text-right font-mono font-black text-blue-600 dark:text-blue-400">Rs. {b.selling_price.toFixed(2)}</td>
+                                                        <td className="px-4 py-3 font-mono">{b.expiry_date || 'N/A'}</td>
+                                                        <td className="px-4 py-3 text-center font-mono">
+                                                            {daysLeft !== null ? (
+                                                                <span className={daysLeft < 0 ? 'text-destructive font-black' : daysLeft <= 7 ? 'text-orange-600 font-bold' : 'text-emerald-600 font-semibold'}>
+                                                                    {daysLeft < 0 ? `Expired (${Math.abs(daysLeft)}d)` : `${daysLeft} days`}
+                                                                </span>
+                                                            ) : 'N/A'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-mono font-bold text-foreground">{b.available_quantity}</td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            {getExpiryBadge(b.expiry_date)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <Button
+                                                                onClick={() => handleSelectBatch(b)}
+                                                                disabled={b.available_quantity <= 0 || (isExpired && !isAdmin)}
+                                                                className={`h-8 px-3 rounded-lg text-[10px] font-bold gap-1 ${
+                                                                    isExpired 
+                                                                        ? 'bg-rose-600 hover:bg-rose-500 text-white' 
+                                                                        : 'bg-blue-600 hover:bg-blue-500 text-white'
+                                                                }`}
+                                                            >
+                                                                {isExpired && isAdmin ? 'Override' : 'Select'}
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={9} className="text-center py-8 text-muted-foreground">
+                                                    No active batches match the search filters.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
             {/* CUSTOMER PICKER MODAL */}
             <Dialog open={showCustomerModal} onOpenChange={setShowCustomerModal}>
                 <DialogContent className="sm:max-w-md rounded-2xl p-6">
@@ -683,7 +894,7 @@ export default function Pos({ products = [], categories = [], customers = [], he
                             placeholder="Search by customer name or phone..."
                             value={customerSearch}
                             onChange={(e) => setCustomerSearch(e.target.value)}
-                            className="h-10 rounded-xl"
+                            className="h-10 rounded-xl text-xs"
                         />
                         <div className="max-h-60 overflow-y-auto divide-y divide-border/40">
                             {filteredCustomers.map((cust) => (
@@ -719,7 +930,7 @@ export default function Pos({ products = [], categories = [], customers = [], he
                     <div className="space-y-5 mt-3">
                         <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-center space-y-1">
                             <span className="text-xs font-medium text-muted-foreground">Amount Payable</span>
-                            <div className="text-3xl font-black text-blue-600 dark:text-blue-400">
+                            <div className="text-3xl font-black text-blue-600 dark:text-blue-400 font-mono">
                                 {formatCurrency(grandTotal)}
                             </div>
                         </div>
@@ -767,15 +978,15 @@ export default function Pos({ products = [], categories = [], customers = [], he
                                 <label className="text-xs font-semibold text-muted-foreground">Amount Tendered</label>
                                 <Input
                                     type="number"
-                                    placeholder={grandTotal.toString()}
+                                    placeholder={grandTotal.toFixed(2)}
                                     value={amountTendered}
                                     onChange={(e) => setAmountTendered(e.target.value)}
-                                    className="h-11 text-base font-bold rounded-xl"
+                                    className="h-11 text-base font-bold rounded-xl font-mono"
                                 />
                                 {parseFloat(amountTendered) > 0 && (
                                     <div className="flex justify-between items-center p-3 rounded-xl bg-muted/40 text-xs">
                                         <span className="text-muted-foreground font-medium">Change Due:</span>
-                                        <span className="font-black text-emerald-600 text-sm">
+                                        <span className="font-black text-emerald-600 text-sm font-mono">
                                             {formatCurrency(changeDue)}
                                         </span>
                                     </div>
@@ -810,11 +1021,16 @@ export default function Pos({ products = [], categories = [], customers = [], he
                                 <span>{lastCompletedSale.date}</span>
                             </div>
 
-                            <div className="border-t border-b border-dashed border-border py-2 space-y-1">
+                            <div className="border-t border-b border-dashed border-border py-2 space-y-2">
                                 {lastCompletedSale.items.map((item: CartItem, i: number) => (
-                                    <div key={i} className="flex justify-between">
-                                        <span>{item.quantity}x {item.product.name}</span>
-                                        <span>{formatCurrency(item.product.price * item.quantity)}</span>
+                                    <div key={i} className="flex justify-between items-start">
+                                        <div>
+                                            <span>{item.quantity}x {item.product.name}</span>
+                                            <span className="block text-[9px] text-muted-foreground font-mono">
+                                                Batch: {item.batch.batch_number}
+                                            </span>
+                                        </div>
+                                        <span className="font-mono">{formatCurrency(item.batch.selling_price * item.quantity)}</span>
                                     </div>
                                 ))}
                             </div>
@@ -822,15 +1038,11 @@ export default function Pos({ products = [], categories = [], customers = [], he
                             <div className="space-y-1 text-right">
                                 <div className="flex justify-between">
                                     <span>Subtotal</span>
-                                    <span>{formatCurrency(lastCompletedSale.subtotal)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Tax</span>
-                                    <span>{formatCurrency(lastCompletedSale.tax)}</span>
+                                    <span className="font-mono">{formatCurrency(lastCompletedSale.subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between font-bold text-sm pt-1 border-t border-border">
                                     <span>Total Paid</span>
-                                    <span>{formatCurrency(lastCompletedSale.total)}</span>
+                                    <span className="font-mono">{formatCurrency(lastCompletedSale.total)}</span>
                                 </div>
                             </div>
                         </div>
@@ -840,14 +1052,14 @@ export default function Pos({ products = [], categories = [], customers = [], he
                         <Button
                             onClick={() => window.print()}
                             variant="outline"
-                            className="flex-1 h-10 rounded-xl gap-2 font-sans"
+                            className="flex-1 h-10 rounded-xl gap-2 font-sans text-xs"
                         >
                             <Printer className="size-4" />
-                            <span>Print</span>
+                            <span>Print Receipt</span>
                         </Button>
                         <Button
                             onClick={() => setReceiptModalOpen(false)}
-                            className="flex-1 h-10 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-sans"
+                            className="flex-1 h-10 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-sans text-xs font-bold"
                         >
                             Done
                         </Button>
