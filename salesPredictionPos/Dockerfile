@@ -1,5 +1,5 @@
 # Production-ready Dockerfile for Laravel + React (Vite) + Python ML Application
-FROM php:8.3-apache
+FROM php:8.4-apache
 
 # Set working directory
 WORKDIR /var/www/html
