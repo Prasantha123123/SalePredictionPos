@@ -1,0 +1,16 @@
+.git
+.gitignore
+salesPredictionPos/node_modules
+salesPredictionPos/vendor
+salesPredictionPos/public/build
+salesPredictionPos/public/storage
+salesPredictionPos/.env
+salesPredictionPos/.env.*
+!salesPredictionPos/.env.example
+salesPredictionPos/storage/*.key
+salesPredictionPos/storage/logs/*
+salesPredictionPos/storage/framework/cache/data/*
+salesPredictionPos/storage/framework/sessions/*
+salesPredictionPos/storage/framework/views/*
+node_modules
+vendor
