@@ -50,7 +50,7 @@ RUN npm ci || npm install \
     && npm run build
 
 # Install Python machine learning requirements
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
 # Set permissions for Laravel storage and cache directories
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
