@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\AIAssistantService;
 use App\Services\ConversationManager;
 use App\Services\ContextBuilder;
 use App\Services\PromptBuilder;
@@ -19,7 +20,8 @@ class AIService
         protected PromptBuilder $promptBuilder,
         protected RecommendationService $recommendationService,
         protected GeminiService $geminiService,
-        protected GroqService $groqService
+        protected GroqService $groqService,
+        protected AIAssistantService $aiAssistantService
     ) {}
 
     /**
@@ -65,8 +67,22 @@ class AIService
             // 1. Context Construction
             $context = $this->contextBuilder->build($primaryRole);
 
-            // 2. System Prompt construction
-            $systemPrompt = $this->promptBuilder->build($primaryRole, $user->name, $context);
+            // 2. Detect intent and query database if needed
+            $intentResult = $this->aiAssistantService->detectIntent($message);
+            $intent = $intentResult['intent'];
+            $subject = $intentResult['subject'] ?? null;
+            $dataContext = null;
+            $isDataQuery = ($intent !== 'general');
+
+            if ($isDataQuery) {
+                $queryData = $this->aiAssistantService->queryDatabase($intent, $subject);
+                if ($queryData !== null) {
+                    $dataContext = $this->aiAssistantService->formatDataContext($intent, $queryData);
+                }
+            }
+
+            // 3. System Prompt construction (with live data context if available)
+            $systemPrompt = $this->promptBuilder->build($primaryRole, $user->name, $context, $dataContext);
 
             // 3. Dispatch to AI Services (Groq -> Gemini -> Offline Fallback)
             $history = $this->conversationManager->getHistory();
@@ -98,7 +114,7 @@ class AIService
 
             // Fallback to offline mock response if both failed or no keys configured
             if ($reply === null) {
-                $reply = $this->mockAiFallback($message, $primaryRole, $context, $lastError);
+                $reply = $this->mockAiFallback($message, $primaryRole, $context, $lastError, $dataContext);
             }
         } catch (\Exception $e) {
             Log::error('AIService context building error: ' . $e->getMessage());
@@ -109,8 +125,9 @@ class AIService
         $this->conversationManager->appendHistory('user', $message);
         $this->conversationManager->appendHistory('assistant', $reply);
 
-        // Cache response for 5 minutes for performance
-        cache()->put($cacheKey, $reply, now()->addMinutes(5));
+        // Cache: 2 minutes for data queries (freshness), 5 minutes for general
+        $cacheTtl = ($isDataQuery ?? false) ? 2 : 5;
+        cache()->put($cacheKey, $reply, now()->addMinutes($cacheTtl));
 
         return $reply;
     }
@@ -118,8 +135,14 @@ class AIService
     /**
      * Rule-based fallback bot when Gemini API is not configured.
      */
-    protected function mockAiFallback(string $message, string $role, string $context, ?string $apiError = null): string
+    protected function mockAiFallback(string $message, string $role, string $context, ?string $apiError = null, ?string $dataContext = null): string
     {
+        // If we have live database data, return it directly even in fallback mode
+        if ($dataContext !== null && $dataContext !== '') {
+            return "📊 **Live Database Results**\n\n" . $dataContext
+                . "\n\n---\n*Data retrieved from your live POS database. AI formatting is unavailable — showing raw results.*";
+        }
+
         $msgLower = strtolower($message);
 
         // API Key instructions for Admins

@@ -80,7 +80,12 @@ export default function AIAssistantPage() {
 
             const contentType = response.headers.get('content-type') || '';
             if (!contentType.includes('application/json')) {
-                throw new Error('Server returned non-JSON response');
+                // Non-JSON response — likely a 419 CSRF redirect or server error page
+                const errorText = response.status === 419
+                    ? '⚠️ Session expired (CSRF token mismatch). Please refresh the page and try again.'
+                    : `⚠️ Server returned an unexpected response (HTTP ${response.status}). Please refresh the page.`;
+                setMessages((prev) => [...prev, { role: 'assistant', content: errorText }]);
+                return;
             }
 
             const data = await response.json();
@@ -93,9 +98,10 @@ export default function AIAssistantPage() {
                 ]);
             }
         } catch (e) {
+            console.error('AI chat error:', e);
             setMessages((prev) => [
                 ...prev,
-                { role: 'assistant', content: '⚠️ Connection Error: Please verify backend server is online.' }
+                { role: 'assistant', content: '⚠️ Connection Error: Please verify backend server is online and refresh the page.' }
             ]);
         } finally {
             setLoading(false);

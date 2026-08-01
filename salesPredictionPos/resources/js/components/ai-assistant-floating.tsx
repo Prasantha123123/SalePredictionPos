@@ -60,6 +60,7 @@ export default function AIAssistantFloating() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
                 },
                 body: JSON.stringify({ message: userMsg }),
@@ -89,6 +90,7 @@ export default function AIAssistantFloating() {
             await fetch('/ai/clear', {
                 method: 'POST',
                 headers: {
+                    'Accept': 'application/json',
                     'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
                 }
             });
