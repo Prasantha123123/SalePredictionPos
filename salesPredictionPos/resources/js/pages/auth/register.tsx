@@ -43,7 +43,7 @@ export default function Register({ passwordRules }: Props) {
             title="Create business account"
             description="Set up your store and AI prediction workspace in under 2 minutes"
         >
-            <Head title="Register Business - Smart POS AI" />
+            <Head title="Register Business - Smart POS" />
 
             {/* Stepper Progress Bar */}
             <div className="mb-6 space-y-2">

@@ -58,7 +58,7 @@ class ForecastController extends Controller
 
         $latestPrediction = SalesPrediction::whereNotNull('metrics')->latest()->first();
         $metrics = $latestPrediction ? $latestPrediction->metrics : null;
-        $bestModelName = $latestPrediction ? $latestPrediction->model_used : 'XGBoost';
+        $bestModelName = $latestPrediction ? $latestPrediction->model_used : 'xgboost';
 
         return Inertia::render('forecasts/index', [
             'futurePredictions' => $futurePredictions,
@@ -66,15 +66,15 @@ class ForecastController extends Controller
             'averageErrorPercent' => round($avgAccuracy ?? 0, 1),
             'aiRecommendations' => $aiRecommendations,
             'modelInfo' => [
-                'name' => ucfirst($bestModelName) . ' Regressor',
-                'features' => ['day_of_week', 'month', 'is_weekend', 'sales_last_1_day', 'sales_last_7_days', 'transactions', 'discount_amount'],
+                'name' => ucfirst(str_replace('_', ' ', $bestModelName)) . ' Regressor',
+                'features' => ['day_sin', 'day_cos', 'month_sin', 'month_cos', 'is_weekend', 'lag_1', 'lag_7', 'rolling_mean_7', 'transactions_lag1', 'transactions_roll7', 'discount_lag1', 'discount_roll7'],
                 'metrics' => $metrics,
             ],
         ]);
     }
 
     /**
-     * Retrain XGBoost model and regenerate predictions
+     * Retrain forecasting model and regenerate predictions
      */
     public function retrain(PredictionService $predictionService): RedirectResponse
     {
@@ -82,7 +82,7 @@ class ForecastController extends Controller
         $predicted = $predictionService->fetchPredictions();
 
         if ($trained || $predicted) {
-            return back()->with('success', 'XGBoost model retrained and future predictions updated successfully!');
+            return back()->with('success', 'Forecasting model retrained and future predictions updated successfully!');
         }
 
         return back()->with('error', 'Failed to retrain model. Ensure Python ML service is running on http://127.0.0.1:8001');

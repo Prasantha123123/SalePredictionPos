@@ -22,9 +22,9 @@ export default function Login({ status, canResetPassword }: Props) {
     return (
         <AuthSplitLayout
             title="Welcome back"
-            description="Sign in to your Smart POS AI management dashboard"
+            description="Sign in to your Smart POS management dashboard"
         >
-            <Head title="Log in - Smart POS AI" />
+            <Head title="Log in - Smart POS" />
 
             {status && (
                 <motion.div

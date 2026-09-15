@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Edit, Grid, LayoutList, Package, Plus, Save, Search, Trash2, RefreshCw } from 'lucide-react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Edit, Grid, LayoutList, Package, Plus, Save, Search, Trash2, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ interface Product {
     cost?: string | number;
     description?: string | null;
     is_active: boolean;
+    has_expiry?: boolean;
     category_id?: number;
     category?: { id: number; name: string };
     inventory?: { quantity: number; low_stock_threshold: number } | null;
@@ -34,9 +35,13 @@ interface Props {
         links: { url: string | null; label: string; active: boolean }[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
+        from: number | null;
+        to: number | null;
     };
     categories: Category[];
-    filters: { search?: string; category_id?: string };
+    filters: { search?: string; category_id?: string; status?: string; per_page?: string };
 }
 
 function formatCurrency(amount: string | number) {
@@ -129,8 +134,33 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        router.get('/products', { search, category_id: filters.category_id }, { preserveState: true });
+        router.get(
+            '/products',
+            {
+                search: search || undefined,
+                category_id: filters.category_id,
+                status: filters.status,
+                per_page: filters.per_page,
+            },
+            { preserveState: true }
+        );
     };
+
+    const handleFilterChange = (key: string, value: string | undefined) => {
+        const newFilters = {
+            ...filters,
+            search: search || undefined,
+            [key]: value === 'all' || !value ? undefined : value,
+        };
+        router.get('/products', newFilters, { preserveState: true });
+    };
+
+    const handleResetFilters = () => {
+        setSearch('');
+        router.get('/products', {}, { preserveState: true });
+    };
+
+    const hasActiveFilters = Boolean(search || filters.category_id || filters.status || (filters.per_page && filters.per_page !== '15'));
 
     const handleDelete = (product: Product) => {
         if (confirm(`Are you sure you want to delete "${product.name}"?`)) {
@@ -140,17 +170,22 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Product Catalog', href: '/products' }]}>
-            <Head title="Products - Smart POS AI" />
+            <Head title="Products - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header Section */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-black tracking-tight text-foreground">
-                            Products Catalogue
-                        </h1>
-                        <p className="text-xs text-muted-foreground">
-                            Manage retail SKUs, pricing strategies, barcodes, and inventory thresholds.
+                        <div className="flex items-center gap-2.5">
+                            <h1 className="text-2xl font-black tracking-tight text-foreground">
+                                Products Catalogue
+                            </h1>
+                            <Badge variant="secondary" className="px-2.5 py-0.5 font-bold text-xs">
+                                {products.total} {products.total === 1 ? 'Product' : 'Products'}
+                            </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Showing {products.from || 0}–{products.to || 0} of {products.total} products available in your catalogue.
                         </p>
                     </div>
 
@@ -188,36 +223,94 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
                 </div>
 
                 {/* Filters Row */}
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
                     <form onSubmit={handleSearch} className="relative flex-1">
                         <Search className="absolute left-3.5 top-3 size-4 text-muted-foreground" />
                         <Input
                             type="text"
-                            placeholder="Search by product name, SKU..."
+                            placeholder="Search by product name, SKU, or barcode..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="pl-10 h-10 rounded-xl bg-card border-border/60 text-xs"
+                            className="pl-10 pr-8 h-10 rounded-xl bg-card border-border/60 text-xs"
                         />
+                        {search && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearch('');
+                                    router.get('/products', { ...filters, search: undefined }, { preserveState: true });
+                                }}
+                                className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                            >
+                                <X className="size-4" />
+                            </button>
+                        )}
                     </form>
 
-                    <Select
-                        value={filters.category_id || 'all'}
-                        onValueChange={(val) =>
-                            router.get('/products', { ...filters, category_id: val === 'all' ? undefined : val }, { preserveState: true })
-                        }
-                    >
-                        <SelectTrigger className="h-10 w-full sm:w-48 rounded-xl bg-card border-border/60 text-xs">
-                            <SelectValue placeholder="All Categories" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Categories</SelectItem>
-                            {categories.map((c) => (
-                                <SelectItem key={c.id} value={c.id.toString()}>
-                                    {c.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                        {/* Category Filter */}
+                        <Select
+                            value={filters.category_id || 'all'}
+                            onValueChange={(val) => handleFilterChange('category_id', val)}
+                        >
+                            <SelectTrigger className="h-10 w-full sm:w-44 rounded-xl bg-card border-border/60 text-xs">
+                                <SelectValue placeholder="All Categories" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Categories</SelectItem>
+                                {categories.map((c) => (
+                                    <SelectItem key={c.id} value={c.id.toString()}>
+                                        {c.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        {/* Status Filter */}
+                        <Select
+                            value={filters.status || 'all'}
+                            onValueChange={(val) => handleFilterChange('status', val)}
+                        >
+                            <SelectTrigger className="h-10 w-full sm:w-36 rounded-xl bg-card border-border/60 text-xs">
+                                <SelectValue placeholder="All Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="active">Active Only</SelectItem>
+                                <SelectItem value="disabled">Disabled Only</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Per Page Selector */}
+                        <Select
+                            value={filters.per_page || '15'}
+                            onValueChange={(val) => handleFilterChange('per_page', val)}
+                        >
+                            <SelectTrigger className="h-10 w-full sm:w-32 rounded-xl bg-card border-border/60 text-xs">
+                                <SelectValue placeholder="15 per page" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="15">15 per page</SelectItem>
+                                <SelectItem value="25">25 per page</SelectItem>
+                                <SelectItem value="50">50 per page</SelectItem>
+                                <SelectItem value="100">100 per page</SelectItem>
+                                <SelectItem value="all">Show All</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Reset Filters */}
+                        {hasActiveFilters && (
+                            <Button
+                                variant="ghost"
+                                onClick={handleResetFilters}
+                                className="h-10 px-3 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground"
+                                title="Reset all filters"
+                            >
+                                <RefreshCw className="size-3.5 mr-1" />
+                                Reset
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Content Area */}
@@ -225,9 +318,13 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
                     <EmptyState
                         icon={Package}
                         title="No Products Found"
-                        description="There are no items matching your criteria. Try resetting search filters or add a new SKU."
-                        actionLabel="Add New Product"
-                        onAction={openCreateModal}
+                        description={
+                            hasActiveFilters
+                                ? 'There are no products matching your search criteria. Try adjusting or clearing your filters.'
+                                : 'No products have been added to your catalogue yet.'
+                        }
+                        actionLabel={hasActiveFilters ? 'Clear Filters' : 'Add New Product'}
+                        onAction={hasActiveFilters ? handleResetFilters : openCreateModal}
                     />
                 ) : viewMode === 'table' ? (
                     /* Table View */
@@ -326,6 +423,52 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
                                 </div>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* Pagination Controls */}
+                {products.data.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-card border border-border/60 shadow-xs">
+                        <div className="text-xs text-muted-foreground">
+                            Showing <span className="font-bold text-foreground">{products.from || 0}</span> to{' '}
+                            <span className="font-bold text-foreground">{products.to || 0}</span> of{' '}
+                            <span className="font-bold text-foreground">{products.total}</span> products
+                            {products.last_page > 1 && (
+                                <span className="ml-1 font-semibold">
+                                    (Page {products.current_page} of {products.last_page})
+                                </span>
+                            )}
+                        </div>
+
+                        {products.links && products.links.length > 3 && (
+                            <div className="flex flex-wrap items-center gap-1">
+                                {products.links.map((link, idx) => {
+                                    if (!link.url) {
+                                        return (
+                                            <span
+                                                key={idx}
+                                                dangerouslySetInnerHTML={{ __html: link.label }}
+                                                className="px-3 py-1.5 rounded-xl border border-border/40 text-xs text-muted-foreground/50 cursor-not-allowed select-none"
+                                            />
+                                        );
+                                    }
+
+                                    return (
+                                        <Link
+                                            key={idx}
+                                            href={link.url}
+                                            preserveState
+                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                                                link.active
+                                                    ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20'
+                                                    : 'bg-card border-border/60 hover:bg-muted text-foreground'
+                                            }`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

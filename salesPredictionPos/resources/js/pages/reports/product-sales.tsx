@@ -142,7 +142,7 @@ export default function ProductSalesReport({
                 { title: 'Product Sales Report', href: '/reports/product-sales' },
             ]}
         >
-            <Head title="Product Sales Report - Smart POS AI" />
+            <Head title="Product Sales Report - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header Section */}

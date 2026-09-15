@@ -56,7 +56,8 @@ class SaleService
                 }
             }
 
-            $total = $subtotal - $discountAmount;
+            $taxAmount = isset($data['tax_amount']) ? (float) $data['tax_amount'] : 0.0;
+            $total = max(0, round($subtotal - $discountAmount + $taxAmount, 2));
 
             // Generate invoice number
             $invoiceNumber = $this->generateInvoiceNumber();
@@ -68,7 +69,7 @@ class SaleService
                 'user_id' => Auth::id(),
                 'subtotal' => $subtotal,
                 'discount_amount' => $discountAmount,
-                'tax_amount' => 0,
+                'tax_amount' => $taxAmount,
                 'total' => $total,
                 'payment_method' => $data['payment_method'],
                 'status' => 'completed',

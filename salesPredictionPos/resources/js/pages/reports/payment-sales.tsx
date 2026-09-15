@@ -48,7 +48,7 @@ export default function PaymentReport({ paymentReport = [], grandTotal = 0, filt
                 { title: 'Payment Method Report', href: '/reports/payment-sales' },
             ]}
         >
-            <Head title="Payment Method Report - Smart POS AI" />
+            <Head title="Payment Method Report - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header */}

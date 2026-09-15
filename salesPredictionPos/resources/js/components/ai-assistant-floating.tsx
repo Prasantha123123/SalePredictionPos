@@ -115,7 +115,7 @@ export default function AIAssistantFloating() {
                         <div className="flex items-center gap-2">
                             <Bot className="size-4 animate-bounce" />
                             <div className="text-xs">
-                                <p className="font-bold">Smart POS AI Agent</p>
+                                <p className="font-bold">Smart POS Agent</p>
                                 <p className="text-[10px] opacity-80 leading-none mt-0.5">Online Helper</p>
                             </div>
                         </div>

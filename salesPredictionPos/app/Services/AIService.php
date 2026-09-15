@@ -207,9 +207,9 @@ class AIService
 
         // Generic welcome — show API error details if available
         if ($apiError) {
-            return "👋 **Hello! I am your Smart POS AI Assistant.**\n\nI am currently running in **Offline Fallback Mode** because your configured `GEMINI_API_KEY` returned an error:\n> ⚠️ *{$apiError}*\n\nWhile this error persists, I can assist you with:\n- Operations guides (creating products, sales, suppliers)\n- Explaining forecast reports and accuracy metrics (MAPE/RMSE)\n- Reordering stock and tracking product expiry warnings";
+            return "👋 **Hello! I am your Smart POS Assistant.**\n\nI am currently running in **Offline Fallback Mode** because your configured `GEMINI_API_KEY` returned an error:\n> ⚠️ *{$apiError}*\n\nWhile this error persists, I can assist you with:\n- Operations guides (creating products, sales, suppliers)\n- Explaining forecast reports and accuracy metrics (MAPE/RMSE)\n- Reordering stock and tracking product expiry warnings";
         }
 
-        return "👋 **Hello! I am your Smart POS AI Assistant.**\n\nI can assist you with:\n- Operations guides (creating products, sales, suppliers)\n- Explaining forecast reports and accuracy metrics (MAPE/RMSE)\n- Reordering stock and tracking product expiry warnings\n\n*Note: Add `GEMINI_API_KEY` to your `.env` file to unlock live conversation and customized analytics using Google Gemini 2.5 Flash!*";
+        return "👋 **Hello! I am your Smart POS Assistant.**\n\nI can assist you with:\n- Operations guides (creating products, sales, suppliers)\n- Explaining forecast reports and accuracy metrics (MAPE/RMSE)\n- Reordering stock and tracking product expiry warnings\n\n*Note: Add `GEMINI_API_KEY` to your `.env` file to unlock live conversation and customized analytics using Google Gemini 2.5 Flash!*";
     }
 }

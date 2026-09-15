@@ -31,12 +31,29 @@ class ProductController extends Controller
             $query->where('category_id', $categoryId);
         }
 
-        $products = $query->latest()->paginate(15)->withQueryString();
+        if ($request->filled('status')) {
+            $status = $request->input('status');
+            if ($status === 'active') {
+                $query->where('is_active', true);
+            } elseif ($status === 'disabled') {
+                $query->where('is_active', false);
+            }
+        }
+
+        $perPageParam = $request->input('per_page', '15');
+        if ($perPageParam === 'all' || (int) $perPageParam <= 0) {
+            $totalCount = Product::count();
+            $perPage = $totalCount > 0 ? $totalCount : 1000;
+        } else {
+            $perPage = (int) $perPageParam;
+        }
+
+        $products = $query->latest()->paginate($perPage)->withQueryString();
 
         return Inertia::render('products/index', [
             'products' => $products,
             'categories' => Category::where('is_active', true)->get(),
-            'filters' => $request->only(['search', 'category_id']),
+            'filters' => $request->only(['search', 'category_id', 'status', 'per_page']),
         ]);
     }
 

@@ -42,7 +42,7 @@ export default function InventoryReport({ inventoryList = [], summary }: Props) 
                 { title: 'Inventory Valuation Report', href: '/reports/inventory-sales' },
             ]}
         >
-            <Head title="Inventory Report - Smart POS AI" />
+            <Head title="Inventory Report - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header */}

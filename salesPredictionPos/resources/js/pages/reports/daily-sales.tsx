@@ -178,7 +178,7 @@ export default function DailySalesReport({
                 { title: 'Daily Sales Report', href: '/reports/daily-sales' },
             ]}
         >
-            <Head title="Daily Sales Report - Smart POS AI" />
+            <Head title="Daily Sales Report - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header Section */}

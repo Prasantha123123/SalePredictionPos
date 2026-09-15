@@ -49,7 +49,7 @@ export default function ExpiryReport({ batches = [], summary, filters }: Props) 
                 { title: 'Expiry & Waste Report', href: '/reports/expiry-report' },
             ]}
         >
-            <Head title="Expiry & Waste Report - Smart POS AI" />
+            <Head title="Expiry & Waste Report - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header */}

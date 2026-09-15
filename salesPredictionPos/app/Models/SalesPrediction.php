@@ -16,6 +16,7 @@ class SalesPrediction extends Model
         'model_used',
         'features',
         'confidence',
+        'metrics',
     ];
 
     protected $casts = [
@@ -24,5 +25,6 @@ class SalesPrediction extends Model
         'actual_amount' => 'decimal:2',
         'features' => 'array',
         'confidence' => 'decimal:2',
+        'metrics' => 'array',
     ];
 }

@@ -28,7 +28,7 @@ export default function VerifyEmail({ status }: Props) {
             title="Verify your email"
             description="We've sent a verification link to your email address. Please click the link to activate your store."
         >
-            <Head title="Verify Email - Smart POS AI" />
+            <Head title="Verify Email - Smart POS" />
 
             <div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-center space-y-3">
                 <div className="size-12 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-600 dark:text-blue-400">

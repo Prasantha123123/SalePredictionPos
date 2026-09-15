@@ -55,6 +55,9 @@ interface Props {
         links: { url: string | null; label: string; active: boolean }[];
         current_page: number;
         last_page: number;
+        total?: number;
+        from?: number | null;
+        to?: number | null;
     };
     lowStockCount: number;
     filters: { search?: string; low_stock?: string };
@@ -436,6 +439,48 @@ export default function InventoryIndex({ inventory, lowStockCount = 0, filters, 
                                     })}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Pagination */}
+                {inventory.data.length > 0 && inventory.links && inventory.links.length > 3 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-card border border-border/60 shadow-xs text-xs">
+                        <div className="text-muted-foreground">
+                            Showing <span className="font-bold text-foreground">{inventory.from || 0}</span> to{' '}
+                            <span className="font-bold text-foreground">{inventory.to || 0}</span> of{' '}
+                            <span className="font-bold text-foreground">{inventory.total || inventory.data.length}</span> items
+                            {inventory.last_page > 1 && (
+                                <span className="ml-1 font-semibold">
+                                    (Page {inventory.current_page} of {inventory.last_page})
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1">
+                            {inventory.links.map((link, idx) => {
+                                if (!link.url) {
+                                    return (
+                                        <span
+                                            key={idx}
+                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                            className="px-3 py-1.5 rounded-xl border border-border/40 text-muted-foreground/50 cursor-not-allowed select-none"
+                                        />
+                                    );
+                                }
+                                return (
+                                    <Link
+                                        key={idx}
+                                        href={link.url}
+                                        preserveState
+                                        dangerouslySetInnerHTML={{ __html: link.label }}
+                                        className={`px-3 py-1.5 rounded-xl border font-bold transition-all ${
+                                            link.active
+                                                ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20'
+                                                : 'bg-card border-border/60 hover:bg-muted text-foreground'
+                                        }`}
+                                    />
+                                );
+                            })}
                         </div>
                     </div>
                 )}

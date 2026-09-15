@@ -31,7 +31,7 @@ export default function CustomerReport({ topCustomers = [] }: Props) {
                 { title: 'Customer Spending Report', href: '/reports/customer-sales' },
             ]}
         >
-            <Head title="Customer Report - Smart POS AI" />
+            <Head title="Customer Report - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header */}

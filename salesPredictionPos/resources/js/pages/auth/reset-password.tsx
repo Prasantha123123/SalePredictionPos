@@ -36,7 +36,7 @@ export default function ResetPassword({ token, email }: Props) {
             title="Set new password"
             description="Create a robust new password to secure your POS admin account."
         >
-            <Head title="Reset Password - Smart POS AI" />
+            <Head title="Reset Password - Smart POS" />
 
             <Form
                 {...update.form()}

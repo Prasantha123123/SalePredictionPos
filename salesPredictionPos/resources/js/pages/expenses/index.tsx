@@ -112,7 +112,7 @@ export default function ExpensesIndex({ expenses, categories = [], filters, tota
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Operating Expenses', href: '/expenses' }]}>
-            <Head title="Expense Tracker - Smart POS AI" />
+            <Head title="Expense Tracker - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header Title Section */}

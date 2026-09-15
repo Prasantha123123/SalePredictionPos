@@ -14,7 +14,7 @@ class PromptBuilder
      */
     public function build(string $role, string $name, string $context, ?string $dataContext = null): string
     {
-        $prompt = "You are the 'Smart POS AI Assistant', an intelligent, premium chatbot helper built directly inside the Sri Lankan POS & Sales Forecasting system.
+        $prompt = "You are the 'Smart POS Assistant', an intelligent, premium chatbot helper built directly inside the Sri Lankan POS & Sales Forecasting system.
 You are talking to {$name}, who is logged in with the role of: '{$role}'.
 You must act as a professional POS operations agent. Follow these rules:
 

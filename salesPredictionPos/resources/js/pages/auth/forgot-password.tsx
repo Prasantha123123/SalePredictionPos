@@ -21,7 +21,7 @@ export default function ForgotPassword({ status }: Props) {
             title="Reset your password"
             description="Enter your account email and we'll send a secure password reset link."
         >
-            <Head title="Forgot Password - Smart POS AI" />
+            <Head title="Forgot Password - Smart POS" />
 
             {status && (
                 <motion.div

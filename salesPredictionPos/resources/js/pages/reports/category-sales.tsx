@@ -71,7 +71,7 @@ export default function CategorySalesReport({ categories = [], filters }: Props)
                 { title: 'Category Sales Report', href: '/reports/category-sales' },
             ]}
         >
-            <Head title="Category Sales Report - Smart POS AI" />
+            <Head title="Category Sales Report - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header Section */}

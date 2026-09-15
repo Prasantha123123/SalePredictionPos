@@ -44,7 +44,7 @@ export default function ProfitReport({ summary, filters }: Props) {
                 { title: 'Profit Loss Audit Report', href: '/reports/profit-sales' },
             ]}
         >
-            <Head title="Profit Loss Report - Smart POS AI" />
+            <Head title="Profit Loss Report - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header */}

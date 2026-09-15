@@ -50,7 +50,7 @@ export default function AIAssistantPage() {
                 setMessages([
                     {
                         role: 'assistant',
-                        content: "👋 **Welcome to the Smart POS AI Assistant!**\n\nI can retrieve store parameters, explain predictive ML charts, help create inventories, and query expiration reports. How can I help you operate the system today?"
+                        content: "👋 **Welcome to the Smart POS Assistant!**\n\nI can retrieve store parameters, explain predictive ML charts, help create inventories, and query expiration reports. How can I help you operate the system today?"
                     }
                 ]);
             }

@@ -91,7 +91,7 @@ export default function AnalyticsDashboard({
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Analytics Dashboard', href: '/reports' }]}>
-            <Head title="Analytics & Executive Reports - Smart POS AI" />
+            <Head title="Analytics & Executive Reports - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header Title & Action Buttons */}

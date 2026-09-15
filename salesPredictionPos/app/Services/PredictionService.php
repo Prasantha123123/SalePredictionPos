@@ -18,14 +18,14 @@ class PredictionService
     }
 
     /**
-     * Fetch daily sales history, structure it, and train the XGBoost model.
+     * Fetch daily sales history, structure it, and train the forecasting model comparison.
      */
     public function trainModel(): bool
     {
         try {
-            // Aggregate sales by date for the last 90 days
+            // Aggregate sales by date for the last 365 days
             $history = Sale::where('status', 'completed')
-                ->where('created_at', '>=', now()->subDays(90))
+                ->where('created_at', '>=', now()->subDays(365))
                 ->selectRaw('DATE(created_at) as date, SUM(total) as total_sales, COUNT(*) as transactions, SUM(discount_amount) as discount_amount')
                 ->groupByRaw('DATE(created_at)')
                 ->orderBy('date')
@@ -39,7 +39,7 @@ class PredictionService
                 ->toArray();
 
             if (count($history) < 10) {
-                Log::warning('Insufficient sales days to train XGBoost model. Count: ' . count($history));
+                Log::warning('Insufficient sales days to train ML model. Count: ' . count($history));
                 return false;
             }
 
@@ -48,7 +48,17 @@ class PredictionService
             ]);
 
             if ($response->successful()) {
-                Log::info('ML service model trained successfully: ' . $response->body());
+                $responseData = $response->json();
+                Log::info('ML service model trained successfully', $responseData);
+
+                $metricsSummary = $responseData['metrics'] ?? null;
+                if ($metricsSummary) {
+                    SalesPrediction::query()->update([
+                        'metrics' => $metricsSummary,
+                        'model_used' => $metricsSummary['best_model'] ?? 'xgboost',
+                    ]);
+                }
+
                 return true;
             }
 
@@ -80,7 +90,7 @@ class PredictionService
                 'discount_amount' => (float) ($metrics->discount_amount ?? 0),
             ];
 
-            // If no sales yesterday, fallback to latest daily sales record to prevent complete failure
+            // If no sales yesterday, fallback to latest daily sales record
             if ($lastKnown['total_sales'] <= 0) {
                 $latestDay = Sale::where('status', 'completed')
                     ->selectRaw('DATE(created_at) as date, SUM(total) as total_sales, COUNT(*) as transactions, SUM(discount_amount) as discount_amount')
@@ -109,28 +119,48 @@ class PredictionService
                 Log::warning('Could not retrieve model metrics: ' . $ex->getMessage());
             }
 
+            // Retrieve recent daily sales history (last 30 days) to supply real lag values for prediction
+            $recentHistory = Sale::where('status', 'completed')
+                ->where('created_at', '>=', now()->subDays(30))
+                ->selectRaw('DATE(created_at) as date, SUM(total) as total_sales, COUNT(*) as transactions, SUM(discount_amount) as discount_amount')
+                ->groupByRaw('DATE(created_at)')
+                ->orderBy('date')
+                ->get()
+                ->map(fn ($row) => [
+                    'date' => $row->date,
+                    'total_sales' => (float) $row->total_sales,
+                    'transactions' => (int) $row->transactions,
+                    'discount_amount' => (float) $row->discount_amount,
+                ])
+                ->toArray();
+
             $response = Http::timeout(10)->post("{$this->baseUrl}/predict", [
                 'last_known' => $lastKnown,
+                'history' => $recentHistory,
                 'days' => 30,
             ]);
 
             if ($response->successful()) {
                 $data = $response->json();
-                
-                // Store predictions
+                $bestModel = $metricsData['best_model'] ?? 'xgboost';
+
+                // Store predictions with complete feature vectors and accuracy metrics
                 foreach ($data['next_30_days'] as $pred) {
                     SalesPrediction::updateOrCreate(
                         ['prediction_date' => $pred['date']],
                         [
                             'predicted_amount' => $pred['predicted_amount'],
                             'confidence' => $pred['confidence'],
-                            'model_used' => $metricsData['best_model'] ?? 'xgboost',
-                            'features' => [
+                            'model_used' => $bestModel,
+                            'features' => $pred['features'] ?? [
                                 'day_of_week' => Carbon::parse($pred['date'])->dayOfWeek,
                                 'month' => Carbon::parse($pred['date'])->month,
                                 'is_weekend' => Carbon::parse($pred['date'])->isWeekend() ? 1 : 0,
+                                'lag_1' => (float) $lastKnown['total_sales'],
+                                'lag_7' => (float) $lastKnown['total_sales'],
+                                'rolling_mean_7' => (float) $lastKnown['total_sales'],
                             ],
-                            'metrics' => $metricsData['metrics'] ?? null,
+                            'metrics' => $metricsData,
                         ]
                     );
                 }

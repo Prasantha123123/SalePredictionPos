@@ -89,7 +89,7 @@ export default function UsersIndex({ users, roles = [] }: Props) {
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Team & Role Permissions', href: '/users' }]}>
-            <Head title="Staff Accounts - Smart POS AI" />
+            <Head title="Staff Accounts - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header Title Section */}

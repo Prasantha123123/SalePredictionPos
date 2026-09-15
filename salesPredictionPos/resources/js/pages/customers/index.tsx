@@ -93,7 +93,7 @@ export default function CustomersIndex({ customers, filters }: Props) {
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Customers Directory', href: '/customers' }]}>
-            <Head title="Customer Directory - Smart POS AI" />
+            <Head title="Customer Directory - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header Title Section */}

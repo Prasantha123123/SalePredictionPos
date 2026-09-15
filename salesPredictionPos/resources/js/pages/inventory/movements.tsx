@@ -83,7 +83,7 @@ export default function InventoryMovements({ movements }: Props) {
                 { title: 'Stock Movement Audit Log', href: '/inventory/movements' },
             ]}
         >
-            <Head title="Stock Movement Audit Log - Smart POS AI" />
+            <Head title="Stock Movement Audit Log - Smart POS" />
 
             <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
                 {/* Header Title Section */}
