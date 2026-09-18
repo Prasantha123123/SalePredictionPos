@@ -57,6 +57,17 @@ class VibeArcDataSeeder extends Seeder
         );
         $cashier->assignRole("Cashier");
 
+        $developer = User::firstOrCreate(
+            ["email" => "developer@smartpos.lk"],
+            [
+                "name" => "Developer",
+                "password" => bcrypt("password"),
+                "phone" => "+94770000000",
+                "is_active" => true,
+            ]
+        );
+        $developer->assignRole("Developer");
+
         $driver = DB::getDriverName();
         if ($driver === "mysql") {
             DB::statement("SET FOREIGN_KEY_CHECKS=0;");

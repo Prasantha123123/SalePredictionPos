@@ -28,6 +28,7 @@ class RolePermissionSeeder extends Seeder
             'view-audit-logs',
             'view-suppliers',
             'manage-suppliers',
+            'view-testing-dashboard',
         ];
 
         foreach ($permissions as $permission) {
@@ -35,8 +36,25 @@ class RolePermissionSeeder extends Seeder
         }
 
         // Create roles and assign permissions
+        $developer = Role::firstOrCreate(['name' => 'Developer']);
+        $developer->givePermissionTo(Permission::all());
+
         $superAdmin = Role::firstOrCreate(['name' => 'Super Admin']);
-        $superAdmin->givePermissionTo(Permission::all());
+        $superAdmin->givePermissionTo([
+            'create-sale',
+            'view-dashboard',
+            'manage-products',
+            'manage-inventory',
+            'manage-users',
+            'view-reports',
+            'view-forecast',
+            'manage-expenses',
+            'manage-discounts',
+            'manage-customers',
+            'view-audit-logs',
+            'view-suppliers',
+            'manage-suppliers',
+        ]);
 
         $admin = Role::firstOrCreate(['name' => 'Admin']);
         $admin->givePermissionTo([

@@ -1,0 +1,144 @@
+{
+    "timestamp": "2026-09-16 08:34:30",
+    "environment": {
+        "php_version": "8.2.12",
+        "os": "WINNT (Windows NT 10.0)",
+        "database": "mysql",
+        "driver": "mysql",
+        "catalog_products": 13735,
+        "total_sales": 25468,
+        "total_sale_items": 53131
+    },
+    "benchmarks": {
+        "db_product_search": {
+            "name": "Database: Product Search (13k catalog)",
+            "stats": {
+                "min": 0.86,
+                "max": 2.76,
+                "avg": 1.69,
+                "median": 1.76,
+                "p95": 2.63,
+                "count": 20
+            },
+            "success": 20,
+            "failed": 0
+        },
+        "db_sales_aggregation": {
+            "name": "Database: 30-Day Sales Aggregation (25k sales)",
+            "stats": {
+                "min": 78.52,
+                "max": 129.06,
+                "avg": 105.15,
+                "median": 105.64,
+                "p95": 126.66,
+                "count": 20
+            },
+            "success": 20,
+            "failed": 0
+        },
+        "db_top_products": {
+            "name": "Database: Top 10 Products by Revenue (53k items join)",
+            "stats": {
+                "min": 344.74,
+                "max": 452.47,
+                "avg": 414.42,
+                "median": 426.05,
+                "p95": 444.76,
+                "count": 20
+            },
+            "success": 20,
+            "failed": 0
+        },
+        "ai_intent_detection": {
+            "name": "AI Assistant: Intent Detection & Routing",
+            "stats": {
+                "min": 0,
+                "max": 0.02,
+                "avg": 0.01,
+                "median": 0.01,
+                "p95": 0.02,
+                "count": 20
+            },
+            "success": 20,
+            "failed": 0
+        },
+        "fastapi_health": {
+            "name": "FastAPI: GET \/health",
+            "stats": {
+                "min": 1.69,
+                "max": 23.66,
+                "avg": 7.38,
+                "median": 2.28,
+                "p95": 22.92,
+                "count": 20
+            },
+            "success": 20,
+            "failed": 0
+        },
+        "fastapi_predict": {
+            "name": "FastAPI: POST \/predict (30-day recursive forecast)",
+            "stats": {
+                "min": 186.48,
+                "max": 300.6,
+                "avg": 222.95,
+                "median": 215.22,
+                "p95": 300.6,
+                "count": 15
+            },
+            "success": 15,
+            "failed": 0
+        },
+        "fastapi_train": {
+            "name": "FastAPI: POST \/train (XGBoost\/RF\/Linear fit & selection)",
+            "stats": {
+                "min": 193.51,
+                "max": 226.79,
+                "avg": 217.08,
+                "median": 222.63,
+                "p95": 226.79,
+                "count": 5
+            },
+            "success": 5,
+            "failed": 0
+        },
+        "pos_sale_transaction": {
+            "name": "POS: Complete Sale Transaction Cycle (Stock deduct + movement + payment + audit)",
+            "stats": {
+                "min": 11.23,
+                "max": 42.67,
+                "avg": 16.21,
+                "median": 14.16,
+                "p95": 42.67,
+                "count": 15
+            },
+            "success": 15,
+            "failed": 0
+        },
+        "login_page": {
+            "name": "GET \/login (Auth page render)",
+            "stats": {
+                "min": 226.11,
+                "max": 287.33,
+                "avg": 246.63,
+                "median": 244.13,
+                "p95": 287.33,
+                "count": 10
+            },
+            "success": 10,
+            "failed": 0
+        },
+        "home_redirect": {
+            "name": "GET \/ (Root redirect to login)",
+            "stats": {
+                "min": 216.27,
+                "max": 254.6,
+                "avg": 235.48,
+                "median": 236.86,
+                "p95": 254.6,
+                "count": 10
+            },
+            "success": 10,
+            "failed": 0
+        }
+    }
+}

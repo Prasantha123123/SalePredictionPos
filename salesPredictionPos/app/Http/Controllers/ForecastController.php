@@ -27,6 +27,7 @@ class ForecastController extends Controller
 
         $historicalAccuracy = SalesPrediction::whereNotNull('actual_amount')
             ->where('prediction_date', '>=', Carbon::now()->subDays(30))
+            ->where('prediction_date', '<', Carbon::today())
             ->orderBy('prediction_date')
             ->get()
             ->map(fn ($p) => [
@@ -81,10 +82,26 @@ class ForecastController extends Controller
         $trained = $predictionService->trainModel();
         $predicted = $predictionService->fetchPredictions();
 
-        if ($trained || $predicted) {
+        if ($trained && $predicted) {
+            Inertia::flash('toast', [
+                'type' => 'success',
+                'message' => 'Forecasting model retrained and future predictions updated successfully!',
+            ]);
             return back()->with('success', 'Forecasting model retrained and future predictions updated successfully!');
         }
 
+        if ($predicted && !$trained) {
+            Inertia::flash('toast', [
+                'type' => 'success',
+                'message' => 'Predictions updated with baseline model features.',
+            ]);
+            return back()->with('success', 'Predictions updated with baseline model features.');
+        }
+
+        Inertia::flash('toast', [
+            'type' => 'error',
+            'message' => 'Failed to retrain model. Ensure Python ML service is running on http://127.0.0.1:8001',
+        ]);
         return back()->with('error', 'Failed to retrain model. Ensure Python ML service is running on http://127.0.0.1:8001');
     }
 }

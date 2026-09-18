@@ -118,7 +118,7 @@ class GeminiService
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $jsonPayload,
             CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYPEER => config('services.curl_ssl_verify', app()->isProduction()),
             CURLOPT_TIMEOUT        => $timeout,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
         ]);

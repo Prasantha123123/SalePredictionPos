@@ -68,6 +68,17 @@ class DemoDataSeeder extends Seeder
         );
         $cashier->assignRole('Cashier');
 
+        $developer = User::firstOrCreate(
+            ['email' => 'developer@smartpos.lk'],
+            [
+                'name' => 'Developer',
+                'password' => bcrypt('password'),
+                'phone' => '+94770000000',
+                'is_active' => true,
+            ]
+        );
+        $developer->assignRole('Developer');
+
         // Categories
         $categories = [
             ['name' => 'Beverages', 'description' => 'Hot and cold drinks, juices, and water'],

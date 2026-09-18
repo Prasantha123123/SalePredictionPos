@@ -107,7 +107,12 @@ export default function ForecastsIndex({
     const handleRetrain = () => {
         setIsTraining(true);
         router.post('/forecasts/retrain', {}, {
+            preserveScroll: true,
             onFinish: () => setIsTraining(false),
+            onError: (errors) => {
+                console.error('Failed to retrain model:', errors);
+                setIsTraining(false);
+            },
         });
     };
 

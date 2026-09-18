@@ -199,7 +199,10 @@ class InventoryService
                 ['product_id' => $productId],
                 ['quantity' => 0, 'low_stock_threshold' => 10]
             );
-            $difference = $newQuantity - $inventory->quantity;
+            $currentBatchTotal = (int) InventoryBatch::where('product_id', $productId)
+                ->where('status', 'active')
+                ->sum('available_quantity');
+            $difference = $newQuantity - $currentBatchTotal;
             $oldQuantity = $inventory->quantity;
 
             if ($difference > 0) {

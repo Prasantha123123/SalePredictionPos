@@ -129,6 +129,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('ai-assistant', function () {
         return Inertia\Inertia::render('ai-assistant');
     })->name('ai-assistant.index');
+
+    // Testing & Quality Dashboard (Restricted to Developer)
+    Route::get('testing-dashboard', [App\Http\Controllers\TestingDashboardController::class, 'index'])
+        ->middleware('can:view-testing-dashboard')
+        ->name('testing.dashboard');
+    Route::get('testing-dashboard/export', [App\Http\Controllers\TestingDashboardController::class, 'export'])
+        ->middleware('can:view-testing-dashboard')
+        ->name('testing.export');
 });
 
 require __DIR__.'/settings.php';

@@ -60,7 +60,7 @@ class GroqService
                 'Content-Type: application/json',
                 "Authorization: Bearer {$this->apiKey}",
             ],
-            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYPEER => config('services.curl_ssl_verify', app()->isProduction()),
             CURLOPT_TIMEOUT        => $this->timeoutSeconds,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
         ]);
