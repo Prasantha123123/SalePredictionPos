@@ -1,0 +1,722 @@
+[
+    {
+        "date": "2026-04-04",
+        "total_sales": 10272,
+        "transactions": 7,
+        "discount_amount": 188
+    },
+    {
+        "date": "2026-04-05",
+        "total_sales": 7475.02,
+        "transactions": 11,
+        "discount_amount": 120
+    },
+    {
+        "date": "2026-04-06",
+        "total_sales": 6510,
+        "transactions": 8,
+        "discount_amount": 100
+    },
+    {
+        "date": "2026-04-07",
+        "total_sales": 4290,
+        "transactions": 4,
+        "discount_amount": 50
+    },
+    {
+        "date": "2026-04-08",
+        "total_sales": 5160,
+        "transactions": 5,
+        "discount_amount": 0
+    },
+    {
+        "date": "2026-04-09",
+        "total_sales": 11670.02,
+        "transactions": 8,
+        "discount_amount": 0
+    },
+    {
+        "date": "2026-04-10",
+        "total_sales": 8690,
+        "transactions": 9,
+        "discount_amount": 0
+    },
+    {
+        "date": "2026-04-11",
+        "total_sales": 2550,
+        "transactions": 4,
+        "discount_amount": 150
+    },
+    {
+        "date": "2026-04-12",
+        "total_sales": 7360.28,
+        "transactions": 9,
+        "discount_amount": 519.86
+    },
+    {
+        "date": "2026-04-15",
+        "total_sales": 3910,
+        "transactions": 4,
+        "discount_amount": 100
+    },
+    {
+        "date": "2026-04-16",
+        "total_sales": 2770,
+        "transactions": 5,
+        "discount_amount": 140
+    },
+    {
+        "date": "2026-04-17",
+        "total_sales": 7360,
+        "transactions": 8,
+        "discount_amount": 500
+    },
+    {
+        "date": "2026-04-18",
+        "total_sales": 5580,
+        "transactions": 8,
+        "discount_amount": 450
+    },
+    {
+        "date": "2026-04-19",
+        "total_sales": 3640,
+        "transactions": 5,
+        "discount_amount": 140
+    },
+    {
+        "date": "2026-04-20",
+        "total_sales": 3105,
+        "transactions": 4,
+        "discount_amount": 245
+    },
+    {
+        "date": "2026-04-21",
+        "total_sales": 790,
+        "transactions": 1,
+        "discount_amount": 70
+    },
+    {
+        "date": "2026-04-23",
+        "total_sales": 2260,
+        "transactions": 4,
+        "discount_amount": 70
+    },
+    {
+        "date": "2026-04-24",
+        "total_sales": 5405,
+        "transactions": 4,
+        "discount_amount": 235
+    },
+    {
+        "date": "2026-04-25",
+        "total_sales": 3780,
+        "transactions": 5,
+        "discount_amount": 420
+    },
+    {
+        "date": "2026-04-26",
+        "total_sales": 3410,
+        "transactions": 6,
+        "discount_amount": 140
+    },
+    {
+        "date": "2026-04-28",
+        "total_sales": 1260,
+        "transactions": 1,
+        "discount_amount": 140
+    },
+    {
+        "date": "2026-04-29",
+        "total_sales": 1420,
+        "transactions": 2,
+        "discount_amount": 50
+    },
+    {
+        "date": "2026-04-30",
+        "total_sales": 2550,
+        "transactions": 3,
+        "discount_amount": 250
+    },
+    {
+        "date": "2026-05-01",
+        "total_sales": 9950,
+        "transactions": 8,
+        "discount_amount": 490
+    },
+    {
+        "date": "2026-05-02",
+        "total_sales": 5200,
+        "transactions": 6,
+        "discount_amount": 290
+    },
+    {
+        "date": "2026-05-03",
+        "total_sales": 4230,
+        "transactions": 4,
+        "discount_amount": 70
+    },
+    {
+        "date": "2026-05-04",
+        "total_sales": 550.02,
+        "transactions": 1,
+        "discount_amount": 149.98
+    },
+    {
+        "date": "2026-05-05",
+        "total_sales": 550,
+        "transactions": 1,
+        "discount_amount": 150
+    },
+    {
+        "date": "2026-05-06",
+        "total_sales": 6520,
+        "transactions": 5,
+        "discount_amount": 600
+    },
+    {
+        "date": "2026-05-07",
+        "total_sales": 8080.01,
+        "transactions": 5,
+        "discount_amount": 1049.99
+    },
+    {
+        "date": "2026-05-08",
+        "total_sales": 2625,
+        "transactions": 2,
+        "discount_amount": 225
+    },
+    {
+        "date": "2026-05-09",
+        "total_sales": 7745,
+        "transactions": 6,
+        "discount_amount": 625
+    },
+    {
+        "date": "2026-05-10",
+        "total_sales": 4780,
+        "transactions": 3,
+        "discount_amount": 0
+    },
+    {
+        "date": "2026-05-11",
+        "total_sales": 550,
+        "transactions": 1,
+        "discount_amount": 150
+    },
+    {
+        "date": "2026-05-12",
+        "total_sales": 5480,
+        "transactions": 5,
+        "discount_amount": 600
+    },
+    {
+        "date": "2026-05-13",
+        "total_sales": 3150,
+        "transactions": 2,
+        "discount_amount": 150
+    },
+    {
+        "date": "2026-05-14",
+        "total_sales": 5060,
+        "transactions": 3,
+        "discount_amount": 600
+    },
+    {
+        "date": "2026-05-16",
+        "total_sales": 7810,
+        "transactions": 10,
+        "discount_amount": 600
+    },
+    {
+        "date": "2026-05-17",
+        "total_sales": 11285,
+        "transactions": 9,
+        "discount_amount": 1425
+    },
+    {
+        "date": "2026-05-18",
+        "total_sales": 2060,
+        "transactions": 3,
+        "discount_amount": 200
+    },
+    {
+        "date": "2026-05-19",
+        "total_sales": 3155,
+        "transactions": 4,
+        "discount_amount": 825
+    },
+    {
+        "date": "2026-05-20",
+        "total_sales": 4870,
+        "transactions": 3,
+        "discount_amount": 150
+    },
+    {
+        "date": "2026-05-21",
+        "total_sales": 3400,
+        "transactions": 2,
+        "discount_amount": 100
+    },
+    {
+        "date": "2026-05-22",
+        "total_sales": 4700,
+        "transactions": 4,
+        "discount_amount": 460
+    },
+    {
+        "date": "2026-05-23",
+        "total_sales": 12900,
+        "transactions": 9,
+        "discount_amount": 1050
+    },
+    {
+        "date": "2026-05-24",
+        "total_sales": 7875,
+        "transactions": 3,
+        "discount_amount": 525
+    },
+    {
+        "date": "2026-05-25",
+        "total_sales": 3130.03,
+        "transactions": 3,
+        "discount_amount": 349.97
+    },
+    {
+        "date": "2026-05-26",
+        "total_sales": 7225,
+        "transactions": 3,
+        "discount_amount": 700
+    },
+    {
+        "date": "2026-05-27",
+        "total_sales": 1320,
+        "transactions": 1,
+        "discount_amount": 300
+    },
+    {
+        "date": "2026-05-28",
+        "total_sales": 8413,
+        "transactions": 5,
+        "discount_amount": 932
+    },
+    {
+        "date": "2026-05-29",
+        "total_sales": 6010,
+        "transactions": 2,
+        "discount_amount": 0
+    },
+    {
+        "date": "2026-05-30",
+        "total_sales": 6870,
+        "transactions": 6,
+        "discount_amount": 300
+    },
+    {
+        "date": "2026-05-31",
+        "total_sales": 8810,
+        "transactions": 5,
+        "discount_amount": 250
+    },
+    {
+        "date": "2026-06-01",
+        "total_sales": 2260,
+        "transactions": 3,
+        "discount_amount": 300
+    },
+    {
+        "date": "2026-06-02",
+        "total_sales": 2810,
+        "transactions": 3,
+        "discount_amount": 200
+    },
+    {
+        "date": "2026-06-03",
+        "total_sales": 14455,
+        "transactions": 7,
+        "discount_amount": 825
+    },
+    {
+        "date": "2026-06-04",
+        "total_sales": 5870,
+        "transactions": 3,
+        "discount_amount": 450
+    },
+    {
+        "date": "2026-06-05",
+        "total_sales": 2885,
+        "transactions": 2,
+        "discount_amount": 75
+    },
+    {
+        "date": "2026-06-06",
+        "total_sales": 3475.09,
+        "transactions": 2,
+        "discount_amount": 524.91
+    },
+    {
+        "date": "2026-06-07",
+        "total_sales": 5975,
+        "transactions": 6,
+        "discount_amount": 825
+    },
+    {
+        "date": "2026-06-08",
+        "total_sales": 13532,
+        "transactions": 9,
+        "discount_amount": 1208
+    },
+    {
+        "date": "2026-06-09",
+        "total_sales": 7080,
+        "transactions": 6,
+        "discount_amount": 600
+    },
+    {
+        "date": "2026-06-11",
+        "total_sales": 3280,
+        "transactions": 2,
+        "discount_amount": 300
+    },
+    {
+        "date": "2026-06-12",
+        "total_sales": 10740,
+        "transactions": 8,
+        "discount_amount": 450
+    },
+    {
+        "date": "2026-06-13",
+        "total_sales": 10530,
+        "transactions": 5,
+        "discount_amount": 150
+    },
+    {
+        "date": "2026-06-14",
+        "total_sales": 18285,
+        "transactions": 9,
+        "discount_amount": 2085
+    },
+    {
+        "date": "2026-06-15",
+        "total_sales": 1000,
+        "transactions": 1,
+        "discount_amount": 150
+    },
+    {
+        "date": "2026-06-16",
+        "total_sales": 4165,
+        "transactions": 2,
+        "discount_amount": 525
+    },
+    {
+        "date": "2026-06-17",
+        "total_sales": 9850,
+        "transactions": 6,
+        "discount_amount": 500
+    },
+    {
+        "date": "2026-06-18",
+        "total_sales": 14545,
+        "transactions": 13,
+        "discount_amount": 1275
+    },
+    {
+        "date": "2026-06-19",
+        "total_sales": 8825,
+        "transactions": 7,
+        "discount_amount": 825
+    },
+    {
+        "date": "2026-06-20",
+        "total_sales": 15790,
+        "transactions": 6,
+        "discount_amount": 1250
+    },
+    {
+        "date": "2026-06-21",
+        "total_sales": 11360,
+        "transactions": 8,
+        "discount_amount": 1050
+    },
+    {
+        "date": "2026-06-23",
+        "total_sales": 4905.01,
+        "transactions": 4,
+        "discount_amount": 74.99
+    },
+    {
+        "date": "2026-06-24",
+        "total_sales": 920,
+        "transactions": 1,
+        "discount_amount": 150
+    },
+    {
+        "date": "2026-06-25",
+        "total_sales": 4530,
+        "transactions": 3,
+        "discount_amount": 450
+    },
+    {
+        "date": "2026-06-27",
+        "total_sales": 11720,
+        "transactions": 7,
+        "discount_amount": 450
+    },
+    {
+        "date": "2026-06-28",
+        "total_sales": 9600,
+        "transactions": 4,
+        "discount_amount": 100
+    },
+    {
+        "date": "2026-06-30",
+        "total_sales": 4800,
+        "transactions": 2,
+        "discount_amount": 600
+    },
+    {
+        "date": "2026-07-01",
+        "total_sales": 6550,
+        "transactions": 6,
+        "discount_amount": 350
+    },
+    {
+        "date": "2026-07-03",
+        "total_sales": 1650,
+        "transactions": 2,
+        "discount_amount": 450
+    },
+    {
+        "date": "2026-07-04",
+        "total_sales": 8960,
+        "transactions": 7,
+        "discount_amount": 900
+    },
+    {
+        "date": "2026-07-05",
+        "total_sales": 6325,
+        "transactions": 7,
+        "discount_amount": 975
+    },
+    {
+        "date": "2026-07-07",
+        "total_sales": 5150.03,
+        "transactions": 4,
+        "discount_amount": 899.97
+    },
+    {
+        "date": "2026-07-08",
+        "total_sales": 6915,
+        "transactions": 6,
+        "discount_amount": 525
+    },
+    {
+        "date": "2026-07-09",
+        "total_sales": 6400,
+        "transactions": 5,
+        "discount_amount": 50
+    },
+    {
+        "date": "2026-07-10",
+        "total_sales": 12290,
+        "transactions": 9,
+        "discount_amount": 830
+    },
+    {
+        "date": "2026-07-11",
+        "total_sales": 10880.02,
+        "transactions": 11,
+        "discount_amount": 899.98
+    },
+    {
+        "date": "2026-07-12",
+        "total_sales": 10650,
+        "transactions": 10,
+        "discount_amount": 600
+    },
+    {
+        "date": "2026-07-13",
+        "total_sales": 1000,
+        "transactions": 1,
+        "discount_amount": 0
+    },
+    {
+        "date": "2026-07-14",
+        "total_sales": 6170.01,
+        "transactions": 5,
+        "discount_amount": 249.99
+    },
+    {
+        "date": "2026-07-16",
+        "total_sales": 6410.01,
+        "transactions": 6,
+        "discount_amount": 649.99
+    },
+    {
+        "date": "2026-07-17",
+        "total_sales": 6218,
+        "transactions": 5,
+        "discount_amount": 402
+    },
+    {
+        "date": "2026-07-18",
+        "total_sales": 6440,
+        "transactions": 5,
+        "discount_amount": 300
+    },
+    {
+        "date": "2026-07-19",
+        "total_sales": 4980,
+        "transactions": 3,
+        "discount_amount": 200
+    },
+    {
+        "date": "2026-07-20",
+        "total_sales": 2450,
+        "transactions": 1,
+        "discount_amount": 0
+    },
+    {
+        "date": "2026-07-21",
+        "total_sales": 2825.01,
+        "transactions": 1,
+        "discount_amount": 224.99
+    },
+    {
+        "date": "2026-07-23",
+        "total_sales": 7440,
+        "transactions": 5,
+        "discount_amount": 200
+    },
+    {
+        "date": "2026-07-24",
+        "total_sales": 13220,
+        "transactions": 7,
+        "discount_amount": 140
+    },
+    {
+        "date": "2026-07-25",
+        "total_sales": 2329,
+        "transactions": 1,
+        "discount_amount": 411
+    },
+    {
+        "date": "2026-07-30",
+        "total_sales": 1900,
+        "transactions": 2,
+        "discount_amount": 200
+    },
+    {
+        "date": "2026-08-01",
+        "total_sales": 7880,
+        "transactions": 7,
+        "discount_amount": 600
+    },
+    {
+        "date": "2026-08-02",
+        "total_sales": 13320,
+        "transactions": 9,
+        "discount_amount": 1150
+    },
+    {
+        "date": "2026-08-03",
+        "total_sales": 600,
+        "transactions": 1,
+        "discount_amount": 100
+    },
+    {
+        "date": "2026-08-04",
+        "total_sales": 7320,
+        "transactions": 4,
+        "discount_amount": 450
+    },
+    {
+        "date": "2026-08-05",
+        "total_sales": 4100,
+        "transactions": 3,
+        "discount_amount": 100
+    },
+    {
+        "date": "2026-08-06",
+        "total_sales": 3320,
+        "transactions": 3,
+        "discount_amount": 100
+    },
+    {
+        "date": "2026-08-07",
+        "total_sales": 6330,
+        "transactions": 6,
+        "discount_amount": 200
+    },
+    {
+        "date": "2026-08-08",
+        "total_sales": 17360,
+        "transactions": 13,
+        "discount_amount": 1500
+    },
+    {
+        "date": "2026-08-09",
+        "total_sales": 5010,
+        "transactions": 3,
+        "discount_amount": 200
+    },
+    {
+        "date": "2026-08-10",
+        "total_sales": 5200,
+        "transactions": 2,
+        "discount_amount": 0
+    },
+    {
+        "date": "2026-08-11",
+        "total_sales": 6650,
+        "transactions": 4,
+        "discount_amount": 450
+    },
+    {
+        "date": "2026-08-12",
+        "total_sales": 4200,
+        "transactions": 2,
+        "discount_amount": 50
+    },
+    {
+        "date": "2026-08-13",
+        "total_sales": 10740,
+        "transactions": 7,
+        "discount_amount": 400
+    },
+    {
+        "date": "2026-08-14",
+        "total_sales": 4720,
+        "transactions": 5,
+        "discount_amount": 350
+    },
+    {
+        "date": "2026-08-15",
+        "total_sales": 6040,
+        "transactions": 4,
+        "discount_amount": 600
+    },
+    {
+        "date": "2026-08-16",
+        "total_sales": 12200,
+        "transactions": 9,
+        "discount_amount": 1490
+    },
+    {
+        "date": "2026-08-17",
+        "total_sales": 1620,
+        "transactions": 1,
+        "discount_amount": 0
+    },
+    {
+        "date": "2026-08-19",
+        "total_sales": 7673,
+        "transactions": 4,
+        "discount_amount": 647
+    },
+    {
+        "date": "2026-08-20",
+        "total_sales": 10300,
+        "transactions": 8,
+        "discount_amount": 880
+    }
+]

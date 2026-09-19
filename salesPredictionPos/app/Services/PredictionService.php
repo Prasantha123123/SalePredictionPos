@@ -114,9 +114,14 @@ class PredictionService
                 $responseData = $response->json();
                 Log::info('ML service model trained successfully', $responseData);
 
+                // NOTE: metrics now come from CV-based selection in model.py (no more
+                // test-set leakage), so this value is the honest, current model quality —
+                // safe to stamp onto predictions going forward.
                 $metricsSummary = $responseData['metrics'] ?? null;
                 if ($metricsSummary) {
-                    SalesPrediction::query()->update([
+                    // Scoped to current/future predictions only — avoids rewriting every
+                    // historical row's metrics on every retrain (was previously unscoped).
+                    SalesPrediction::where('prediction_date', '>=', Carbon::today())->update([
                         'metrics' => $metricsSummary,
                         'model_used' => $metricsSummary['best_model'] ?? 'xgboost',
                     ]);

@@ -180,7 +180,7 @@ export default function ForecastsIndex({
                                 </div>
                                 <div className="flex items-center gap-1.5 text-xs text-blue-100 font-medium">
                                     <ShieldCheck className="size-4 text-emerald-400" />
-                                    <span>Confidence Index: {tomorrowPred?.confidence || 95}%</span>
+                                    <span>Confidence Index: {tomorrowPred?.confidence ?? 'N/A'}%</span>
                                 </div>
                             </motion.div>
 
@@ -194,15 +194,15 @@ export default function ForecastsIndex({
                                 <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold">
                                     <span>Validation Error (MAPE)</span>
                                     <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
-                                        {bestMetrics?.mape ? `${bestMetrics.mape}% MAPE` : 'HIGH PRECISION'}
+                                        {bestMetrics?.mape ? `${bestMetrics.mape}% MAPE` : 'NO DATA'}
                                     </Badge>
                                 </div>
                                 <div className="text-3xl font-black text-foreground my-2">
-                                    {bestMetrics?.mape ?? averageErrorPercent}%
+                                    {bestMetrics?.mape ?? averageErrorPercent ?? 'N/A'}%
                                 </div>
                                 <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                                     <CheckCircle2 className="size-3.5 text-emerald-500" />
-                                    <span>R² Score: {bestMetrics?.r2 ?? '0.81'} | RMSE: {bestMetrics?.rmse ? `Rs. ${bestMetrics.rmse}` : 'N/A'}</span>
+                                    <span>R² Score: {bestMetrics?.r2 ?? 'N/A'} | RMSE: {bestMetrics?.rmse ? `Rs. ${bestMetrics.rmse}` : 'N/A'}</span>
                                 </p>
                             </motion.div>
 
@@ -379,11 +379,10 @@ export default function ForecastsIndex({
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-xs font-bold text-foreground">{rec.title}</span>
                                                         <Badge
-                                                            className={`text-[9px] ${
-                                                                rec.status === 'urgent'
-                                                                    ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-                                                                    : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                                            }`}
+                                                            className={`text-[9px] ${rec.status === 'urgent'
+                                                                ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                                                                : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                                                }`}
                                                         >
                                                             {rec.action}
                                                         </Badge>

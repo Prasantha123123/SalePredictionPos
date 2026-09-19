@@ -133,88 +133,123 @@ def compute_mape(y_true, y_pred) -> float:
 
 def train_model(historical_data: list) -> dict:
     """
-    Train multiple models (XGBoost, Random Forest, Linear Regression),
-    compare their performance metrics (RMSE, MAE, MAPE, R2),
-    and save the best performing model.
+    Train the production model using CV-based model selection to avoid
+    test-set leakage.
+
+    FIX (previous version had model-selection leakage):
+    - OLD BUG: trained all 5 models on ONE 80/20 split and picked the
+      "champion" using MAPE measured on that SAME test set. This let the
+      test set influence model choice, producing an optimistically biased,
+      high-variance score (this is what produced the misleading R²=0.777
+      seen on the dashboard, versus R²≈-0.14 from proper 5-fold CV).
+    - NEW: the champion model is chosen using 5-fold rolling-origin CV
+      (the exact same methodology used in the thesis, via
+      evaluate_with_rolling_cv). A separate, untouched chronological
+      holdout set is used ONLY to report final metrics for the already-
+      chosen champion — never to pick between models. The champion is
+      then retrained on all available data for deployment.
     """
     if len(historical_data) < 17:  # Need 7 days for lag_7 + at least 10 usable training days
         print("Too little data to train models. Minimum 17 raw days required.")
         return {}
-        
+
     df = pd.DataFrame(historical_data)
     df = prep_features(df)
-    
+
     if len(df) < 10:
         print("Too little usable data after lag extraction. Minimum 10 usable days required.")
         return {}
-    
+
     X = df[FEATURE_COLUMNS]
     y = df['total_sales']
-    
-    # Chronological Train/Test Split (80/20 time-series split, shuffle=False)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=False)
-    
-    # Compute IQR bounds strictly on the training set to prevent test data leakage
+
+    # ---- STEP 1: Select champion model via rolling-origin CV (no leakage) ----
+    cv_n_splits = 5
+    cv_min_train = max(15, int(len(df) * 0.4))
+    cv_test_size = max(5, int(len(df) * 0.1))
+
+    cv_results = evaluate_with_rolling_cv(
+        historical_data=historical_data,
+        n_splits=cv_n_splits,
+        min_train_size=cv_min_train,
+        test_size=cv_test_size
+    )
+
+    if "error" in cv_results:
+        # Not enough data for proper CV yet — fall back to a fixed default
+        # rather than picking a model based on a single leaked comparison.
+        best_model_name = 'xgboost'
+        cv_summary = {}
+        print(f"CV unavailable ({cv_results['error']}); defaulting best_model to 'xgboost'.")
+    else:
+        best_model_name = cv_results['best_model_by_cv_mape']
+        cv_summary = cv_results.get('summary', {})
+        print(f"Champion model selected via {cv_results['n_splits_completed']}-fold rolling CV: {best_model_name}")
+
+    # ---- STEP 2: Honest, untouched chronological holdout for REPORTING only ----
+    # This split is NEVER used to choose between models — only to report
+    # final metrics for the champion that CV already selected.
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, shuffle=False
+    )
+
     iqr_bounds = compute_iqr_bounds(y_train)
-    
-    # Apply training-derived bounds to clip both training and test target sets
-    y_train = remove_outliers_iqr(y_train, iqr_bounds)
-    y_test = remove_outliers_iqr(y_test, iqr_bounds)
-    
-    models = {
-        'xgboost': xgb.XGBRegressor(n_estimators=100, learning_rate=0.05, max_depth=5, random_state=42),
-        'random_forest': RandomForestRegressor(n_estimators=100, max_depth=6, random_state=42),
-        'linear_regression': LinearRegression(),
-        'ridge': Ridge(alpha=1.0),
-        'lasso': Lasso(alpha=1.0, max_iter=5000)
+    y_train_clipped = remove_outliers_iqr(y_train, iqr_bounds)
+    y_test_clipped = remove_outliers_iqr(y_test, iqr_bounds)
+
+    holdout_model = _build_models()[best_model_name]
+    holdout_model.fit(X_train, y_train_clipped)
+    preds = holdout_model.predict(X_test)
+    preds = np.clip(preds, a_min=0, a_max=None)
+
+    rmse = float(np.sqrt(mean_squared_error(y_test_clipped, preds)))
+    mae = float(mean_absolute_error(y_test_clipped, preds))
+    mape = compute_mape(y_test_clipped, preds)
+    r2 = float(r2_score(y_test_clipped, preds))
+
+    holdout_metrics = {
+        'rmse': round(rmse, 2),
+        'mae': round(mae, 2),
+        'mape': round(mape, 2),
+        'r2': round(r2, 4)
     }
-    
-    best_model_name = None
-    best_model = None
-    best_mape = float('inf')
+
+    # Still compute the full model comparison table for the dashboard's
+    # comparison view — for DISPLAY only, never used to pick the champion.
     comparison_metrics = {}
-    
-    for name, model in models.items():
-        # Train
-        model.fit(X_train, y_train)
-        
-        # Predict on test set
-        preds = model.predict(X_test)
-        preds = np.clip(preds, a_min=0, a_max=None)
-        
-        # Calculate evaluation metrics
-        rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
-        mae = float(mean_absolute_error(y_test, preds))
-        mape = compute_mape(y_test, preds)
-        r2 = float(r2_score(y_test, preds))
-        
+    for name, model in _build_models().items():
+        model.fit(X_train, y_train_clipped)
+        comp_preds = np.clip(model.predict(X_test), a_min=0, a_max=None)
         comparison_metrics[name] = {
-            'rmse': round(rmse, 2),
-            'mae': round(mae, 2),
-            'mape': round(mape, 2),
-            'r2': round(r2, 4)
+            'rmse': round(float(np.sqrt(mean_squared_error(y_test_clipped, comp_preds))), 2),
+            'mae': round(float(mean_absolute_error(y_test_clipped, comp_preds)), 2),
+            'mape': round(compute_mape(y_test_clipped, comp_preds), 2),
+            'r2': round(float(r2_score(y_test_clipped, comp_preds)), 4)
         }
-        
-        # Select best model by lowest MAPE
-        if mape < best_mape:
-            best_mape = mape
-            best_model_name = name
-            best_model = model
-            
-    # Save the best model
-    joblib.dump(best_model, MODEL_PATH)
-    
-    # Save metrics metadata
+
+    # ---- STEP 3: Retrain champion on ALL available data for deployment ----
+    iqr_bounds_full = compute_iqr_bounds(y)
+    y_full_clipped = remove_outliers_iqr(y, iqr_bounds_full)
+
+    deployment_model = _build_models()[best_model_name]
+    deployment_model.fit(X, y_full_clipped)
+    joblib.dump(deployment_model, MODEL_PATH)
+
+    # Same top-level shape the frontend already expects:
+    # modelInfo.metrics.metrics, modelInfo.metrics.comparison, modelInfo.metrics.best_model
     metrics_summary = {
         'best_model': best_model_name,
-        'metrics': comparison_metrics[best_model_name],
+        'selection_method': 'rolling_origin_cv_mape',   # NEW: makes the honest method auditable
+        'metrics': holdout_metrics,                       # honest holdout metrics, not leaked
         'comparison': comparison_metrics,
+        'cv_summary': cv_summary,                         # NEW: 5-fold mean/std per model, for thesis reporting
         'features': FEATURE_COLUMNS,
         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     joblib.dump(metrics_summary, METRICS_PATH)
-    
-    print(f"Best model '{best_model_name}' successfully trained and saved with MAPE: {best_mape:.2f}%")
+
+    print(f"Champion '{best_model_name}' retrained on full data. "
+          f"Holdout R²={r2:.4f}, MAPE={mape:.2f}% (reporting only, not used for selection)")
     return metrics_summary
 
 def evaluate_with_rolling_cv(
@@ -587,6 +622,48 @@ def compare_feature_sets(
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
+def compute_confidence(day_index: int, mape: float | None) -> float:
+    """
+    Confidence estimate grounded in the model's ACTUAL measured validation MAPE
+    (from model_metrics.joblib), decaying further into the future to reflect
+    compounding uncertainty in recursive (autoregressive) multi-step forecasting.
+
+    FIX vs. previous version:
+    - OLD BUG: confidence was np.random.uniform(78, 92) in the cold-start
+      fallback, or a fixed decay max(70.0, 95.0 - i*0.4) with NO relationship
+      to the model's real accuracy — so it could show "94.2%" next to a
+      negative R² model, directly contradicting the validation metrics.
+    - NEW: confidence is derived from the champion model's real MAPE. Still
+      a heuristic (not a true statistical prediction interval), but it now
+      moves honestly with actual model performance instead of being a
+      random or hardcoded number.
+    """
+    if mape is None:
+        # No trained metrics available yet — conservative default that does
+        # NOT claim high accuracy.
+        base = 50.0
+    else:
+        # MAPE 0%   -> confidence ceiling ~95%
+        # MAPE 100%+ -> confidence floor ~0%
+        base = max(0.0, min(95.0, 100.0 - mape))
+
+    # Each recursive step compounds error further, since predicted values
+    # feed back in as lag_1/lag_7/rolling_mean_7 for the next step.
+    decayed = base - (day_index * 1.5)
+    return round(max(5.0, decayed), 1)
+
+
+def _load_champion_mape() -> float | None:
+    """Load the current champion model's honest holdout MAPE, if available."""
+    if os.path.exists(METRICS_PATH):
+        try:
+            saved_metrics = joblib.load(METRICS_PATH)
+            return saved_metrics.get('metrics', {}).get('mape')
+        except Exception:
+            return None
+    return None
+
+
 def predict_sales(last_known_data: dict, days_to_predict: int = 30, history: list = None) -> list:
     """
     Predict sales for the next N days recursively using autoregressive lag and rolling features.
@@ -691,8 +768,10 @@ def predict_sales(last_known_data: dict, days_to_predict: int = 30, history: lis
                 'discount_roll7': round(disc_roll7, 2),
             }
             
-            # NOTE: heuristic confidence for display purposes only — not a statistical prediction interval
-            confidence_val = round(float(np.random.uniform(78, 92)), 1)
+            # Honest confidence, derived from the champion model's real MAPE
+            # (no trained model exists yet in this branch, so this uses the
+            # conservative default inside compute_confidence()).
+            confidence_val = compute_confidence(i, _load_champion_mape())
             
             predictions.append({
                 "date": pred_date.strftime("%Y-%m-%d"),
@@ -705,6 +784,7 @@ def predict_sales(last_known_data: dict, days_to_predict: int = 30, history: lis
 
     # Load trained model
     model = joblib.load(MODEL_PATH)
+    champion_mape = _load_champion_mape()
     predictions = []
     
     for i in range(1, days_to_predict + 1):
@@ -755,8 +835,9 @@ def predict_sales(last_known_data: dict, days_to_predict: int = 30, history: lis
         pred_val = model.predict(feature_row)[0]
         pred_val = max(0.0, float(pred_val))
         
-        # NOTE: heuristic confidence for display purposes only — not a statistical prediction interval
-        confidence_val = round(float(max(70.0, 95.0 - (i * 0.4))), 1)
+        # Honest confidence, derived from the champion model's real MAPE,
+        # decaying further for later days in this recursive forecast.
+        confidence_val = compute_confidence(i, champion_mape)
         
         predictions.append({
             "date": pred_date.strftime("%Y-%m-%d"),
