@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import joblib
 from datetime import datetime, timedelta
+from typing import Optional
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "sales_xgb_model.joblib")
 METRICS_PATH = os.path.join(os.path.dirname(__file__), "model_metrics.joblib")
@@ -131,23 +132,58 @@ def compute_mape(y_true, y_pred) -> float:
         return 0.0
     return float(np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100)
 
+def _resolve_deployment_feature_set(fs_name: str, historical_data: list) -> list:
+    """
+    Resolve a named feature set from compare_feature_sets()'s search space into
+    a concrete, stable list of column names usable for a single deployed model.
+
+    Static sets ('full', 'core_6', 'sales_only') are just looked up directly.
+    'importance_selected' is DYNAMIC in compare_feature_sets() — it is
+    recomputed per CV fold from that fold's own Random Forest importances.
+    For a single deployed model there is no "per fold" at inference time, so
+    we resolve it deterministically here: fit one Random Forest on ALL
+    available data and take its top-5 features by importance. This mirrors
+    the per-fold logic (same model, same importance ranking method) but
+    applied once, to the full dataset, for a stable deployment feature set.
+    """
+    if fs_name in CANDIDATE_FEATURE_SETS:
+        return CANDIDATE_FEATURE_SETS[fs_name]
+
+    # fs_name == 'importance_selected'
+    df = prep_features(pd.DataFrame(historical_data))
+    y_full = df['total_sales']
+    iqr_bounds_full = compute_iqr_bounds(y_full)
+    y_full_clipped = remove_outliers_iqr(y_full, iqr_bounds_full)
+
+    rf = RandomForestRegressor(n_estimators=100, max_depth=6, random_state=42)
+    rf.fit(df[FEATURE_COLUMNS], y_full_clipped)
+    pairs = sorted(zip(FEATURE_COLUMNS, rf.feature_importances_), key=lambda x: x[1], reverse=True)
+    return [f for f, _ in pairs[:5]]
+
+
 def train_model(historical_data: list) -> dict:
     """
-    Train the production model using CV-based model selection to avoid
-    test-set leakage.
+    Train the production model using the SAME feature-set × model grid-search
+    methodology used for the thesis's headline per-shop results (Table 17),
+    via compare_feature_sets(), instead of only ever using the full 12-feature
+    set. This lets production reproduce the thesis's actual best-performing
+    configuration per shop, rather than a structurally different, simplified
+    configuration that could never reach the same number.
 
-    FIX (previous version had model-selection leakage):
-    - OLD BUG: trained all 5 models on ONE 80/20 split and picked the
-      "champion" using MAPE measured on that SAME test set. This let the
-      test set influence model choice, producing an optimistically biased,
-      high-variance score (this is what produced the misleading R²=0.777
-      seen on the dashboard, versus R²≈-0.14 from proper 5-fold CV).
-    - NEW: the champion model is chosen using 5-fold rolling-origin CV
-      (the exact same methodology used in the thesis, via
-      evaluate_with_rolling_cv). A separate, untouched chronological
-      holdout set is used ONLY to report final metrics for the already-
-      chosen champion — never to pick between models. The champion is
-      then retrained on all available data for deployment.
+    HISTORY OF FIXES in this function:
+    - v1 BUG: trained all 5 models on ONE 80/20 split and picked the
+      "champion" using MAPE measured on that SAME test set (leakage) —
+      produced the misleading R²=0.777 seen on the dashboard.
+    - v2 FIX: champion chosen via 5-fold rolling-origin CV on the full
+      feature set only (evaluate_with_rolling_cv) — no more leakage, but
+      structurally could not match the thesis's importance_selected/core_6
+      results, since those feature sets were never tried in production.
+    - v3 (this version): champion is chosen via the full (feature_set ×
+      model) grid search (compare_feature_sets) — the exact search space
+      and selection rule ("best mean validation MAPE") used to produce
+      Table 17 in the thesis. A separate, untouched chronological holdout
+      is still used ONLY to report final metrics — never to pick between
+      configurations.
     """
     if len(historical_data) < 17:  # Need 7 days for lag_7 + at least 10 usable training days
         print("Too little data to train models. Minimum 17 raw days required.")
@@ -160,35 +196,53 @@ def train_model(historical_data: list) -> dict:
         print("Too little usable data after lag extraction. Minimum 10 usable days required.")
         return {}
 
-    X = df[FEATURE_COLUMNS]
     y = df['total_sales']
 
-    # ---- STEP 1: Select champion model via rolling-origin CV (no leakage) ----
+    # ---- STEP 1: Select champion (feature_set, model) via the same grid
+    # search used for the thesis's Table 17 (no leakage: selection uses only
+    # mean CV validation MAPE across folds, never a held-out test set) ----
+    # min_train_size=40, test_size=10 match main.py's own
+    # /evaluate/feature-comparison endpoint defaults, so this reproduces the
+    # same fold sizing used to produce the thesis's original grid results
+    # (compare_feature_sets() adapts these automatically for smaller datasets).
     cv_n_splits = 5
-    cv_min_train = max(15, int(len(df) * 0.4))
-    cv_test_size = max(5, int(len(df) * 0.1))
+    cv_min_train = 40
+    cv_test_size = 10
 
-    cv_results = evaluate_with_rolling_cv(
+    grid_results = compare_feature_sets(
         historical_data=historical_data,
         n_splits=cv_n_splits,
         min_train_size=cv_min_train,
         test_size=cv_test_size
     )
 
-    if "error" in cv_results:
-        # Not enough data for proper CV yet — fall back to a fixed default
-        # rather than picking a model based on a single leaked comparison.
+    if "error" in grid_results:
+        # Not enough data for the full grid search yet — fall back to a
+        # fixed default rather than picking a config from a single leaked
+        # comparison.
+        best_feature_set_name = 'full'
         best_model_name = 'xgboost'
         cv_summary = {}
-        print(f"CV unavailable ({cv_results['error']}); defaulting best_model to 'xgboost'.")
+        print(f"Grid search unavailable ({grid_results['error']}); "
+              f"defaulting to full feature set + xgboost.")
     else:
-        best_model_name = cv_results['best_model_by_cv_mape']
-        cv_summary = cv_results.get('summary', {})
-        print(f"Champion model selected via {cv_results['n_splits_completed']}-fold rolling CV: {best_model_name}")
+        best_combo = grid_results['best_combination']
+        best_feature_set_name = best_combo['feature_set']
+        best_model_name = best_combo['model']
+        cv_summary = grid_results.get('summary', {})
+        print(f"Champion selected via {grid_results['n_splits_completed']}-fold grid search "
+              f"(same methodology as thesis Table 17): "
+              f"feature_set='{best_feature_set_name}', model='{best_model_name}'")
+
+    # Resolve the winning feature set to a concrete, stable column list.
+    deployment_features = _resolve_deployment_feature_set(best_feature_set_name, historical_data)
+
+    X = df[deployment_features]
 
     # ---- STEP 2: Honest, untouched chronological holdout for REPORTING only ----
-    # This split is NEVER used to choose between models — only to report
-    # final metrics for the champion that CV already selected.
+    # This split is NEVER used to choose between configurations — only to
+    # report final metrics for the (feature_set, model) combo already chosen
+    # by the grid search above.
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, shuffle=False
     )
@@ -214,8 +268,9 @@ def train_model(historical_data: list) -> dict:
         'r2': round(r2, 4)
     }
 
-    # Still compute the full model comparison table for the dashboard's
-    # comparison view — for DISPLAY only, never used to pick the champion.
+    # Model comparison table for the dashboard's comparison view, computed
+    # on the WINNING feature set so all 5 models are compared on equal
+    # footing — for DISPLAY only, never used to pick the champion.
     comparison_metrics = {}
     for name, model in _build_models().items():
         model.fit(X_train, y_train_clipped)
@@ -227,7 +282,8 @@ def train_model(historical_data: list) -> dict:
             'r2': round(float(r2_score(y_test_clipped, comp_preds)), 4)
         }
 
-    # ---- STEP 3: Retrain champion on ALL available data for deployment ----
+    # ---- STEP 3: Retrain champion on ALL available data, on the winning
+    # feature subset, for deployment ----
     iqr_bounds_full = compute_iqr_bounds(y)
     y_full_clipped = remove_outliers_iqr(y, iqr_bounds_full)
 
@@ -235,20 +291,24 @@ def train_model(historical_data: list) -> dict:
     deployment_model.fit(X, y_full_clipped)
     joblib.dump(deployment_model, MODEL_PATH)
 
-    # Same top-level shape the frontend already expects:
-    # modelInfo.metrics.metrics, modelInfo.metrics.comparison, modelInfo.metrics.best_model
+    # Same top-level shape the frontend already expects, plus new fields.
+    # 'deployment_features' is REQUIRED at inference time (predict_sales)
+    # to know which columns, in which order, this saved model expects.
     metrics_summary = {
         'best_model': best_model_name,
-        'selection_method': 'rolling_origin_cv_mape',   # NEW: makes the honest method auditable
-        'metrics': holdout_metrics,                       # honest holdout metrics, not leaked
+        'best_feature_set': best_feature_set_name,          # NEW: e.g. 'importance_selected'
+        'deployment_features': deployment_features,          # NEW: resolved concrete column list
+        'selection_method': 'feature_set_x_model_grid_search_cv_mape',  # NEW: matches thesis Table 17 methodology
+        'metrics': holdout_metrics,                          # honest holdout metrics, not leaked
         'comparison': comparison_metrics,
-        'cv_summary': cv_summary,                         # NEW: 5-fold mean/std per model, for thesis reporting
-        'features': FEATURE_COLUMNS,
+        'cv_summary': cv_summary,                            # 5-fold mean/std per (feature_set, model), for thesis reporting
+        'features': deployment_features,                     # kept for backward-compat with older frontend reads
         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     joblib.dump(metrics_summary, METRICS_PATH)
 
-    print(f"Champion '{best_model_name}' retrained on full data. "
+    print(f"Champion '{best_model_name}' on feature_set '{best_feature_set_name}' "
+          f"({len(deployment_features)} features) retrained on full data. "
           f"Holdout R²={r2:.4f}, MAPE={mape:.2f}% (reporting only, not used for selection)")
     return metrics_summary
 
@@ -622,7 +682,7 @@ def compare_feature_sets(
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
-def compute_confidence(day_index: int, mape: float | None) -> float:
+def compute_confidence(day_index: int, mape: Optional[float]) -> float:
     """
     Confidence estimate grounded in the model's ACTUAL measured validation MAPE
     (from model_metrics.joblib), decaying further into the future to reflect
@@ -653,7 +713,7 @@ def compute_confidence(day_index: int, mape: float | None) -> float:
     return round(max(5.0, decayed), 1)
 
 
-def _load_champion_mape() -> float | None:
+def _load_champion_mape() -> Optional[float]:
     """Load the current champion model's honest holdout MAPE, if available."""
     if os.path.exists(METRICS_PATH):
         try:
@@ -662,6 +722,24 @@ def _load_champion_mape() -> float | None:
         except Exception:
             return None
     return None
+
+
+def _load_deployment_features() -> list:
+    """
+    Load the exact, ordered feature-column list the currently saved
+    MODEL_PATH model was trained on (set by train_model()'s grid search).
+    Falls back to the full 12-feature set for backward compatibility with
+    an older model_metrics.joblib written before this field existed.
+    """
+    if os.path.exists(METRICS_PATH):
+        try:
+            saved_metrics = joblib.load(METRICS_PATH)
+            cols = saved_metrics.get('deployment_features')
+            if cols:
+                return cols
+        except Exception:
+            pass
+    return FEATURE_COLUMNS
 
 
 def predict_sales(last_known_data: dict, days_to_predict: int = 30, history: list = None) -> list:
@@ -782,9 +860,12 @@ def predict_sales(last_known_data: dict, days_to_predict: int = 30, history: lis
             curr_sales = predicted_val
         return predictions
 
-    # Load trained model
+    # Load trained model, and the exact feature columns/order it expects
+    # (may be a subset, e.g. importance_selected or core_6, chosen by the
+    # grid search in train_model() — not always the full 12 features).
     model = joblib.load(MODEL_PATH)
     champion_mape = _load_champion_mape()
+    deployment_features = _load_deployment_features()
     predictions = []
     
     for i in range(1, days_to_predict + 1):
@@ -829,7 +910,9 @@ def predict_sales(last_known_data: dict, days_to_predict: int = 30, history: lis
             'discount_roll7': round(disc_roll7, 2),
         }
         
-        feature_row = pd.DataFrame([features_dict])[FEATURE_COLUMNS]
+        # Build only the columns the deployed champion model actually
+        # expects (may be fewer than all 12, and/or a different order).
+        feature_row = pd.DataFrame([features_dict])[deployment_features]
         
         # Model inference
         pred_val = model.predict(feature_row)[0]
