@@ -16,7 +16,7 @@ class GeminiService
     public function __construct()
     {
         $this->apiKey = config('services.gemini.key', env('GEMINI_API_KEY', ''));
-        $this->model = config('services.gemini.model', 'gemini-3.5-flash');
+        $this->model = config('services.gemini.model', 'gemini-2.0-flash');
     }
 
     /**
@@ -97,8 +97,8 @@ class GeminiService
             ],
             'contents' => $contents,
             'generationConfig' => [
-                'temperature' => 0.5,
-                'maxOutputTokens' => 1000,
+                'temperature' => 0.3,
+                'maxOutputTokens' => 150,
             ]
         ];
     }

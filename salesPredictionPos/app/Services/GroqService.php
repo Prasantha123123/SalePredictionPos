@@ -47,8 +47,8 @@ class GroqService
         $payload = json_encode([
             'model'       => $this->model,
             'messages'    => $messages,
-            'temperature' => 0.5,
-            'max_tokens'  => 1000,
+            'temperature' => 0.3,
+            'max_tokens'  => 150,
         ]);
 
         $ch = curl_init($this->endpointUrl);

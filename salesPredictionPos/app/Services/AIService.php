@@ -81,10 +81,14 @@ class AIService
                 }
             }
 
-            // 3. System Prompt construction (with live data context if available)
+            // 3. System Prompt construction
             $systemPrompt = $this->promptBuilder->build($primaryRole, $user->name, $context, $dataContext);
 
-            // 3. Dispatch to AI Services (Groq -> Gemini -> Offline Fallback)
+            // 4. Relevant context slice injection into user query
+            $relevantContext = $dataContext ?: $context;
+            $userQueryWithContext = "Context:\n" . trim($relevantContext) . "\n\nQuestion: " . $message;
+
+            // 5. Dispatch to AI Services (Groq -> Gemini -> Offline Fallback)
             $history = $this->conversationManager->getHistory();
             $reply = null;
             $lastError = null;
@@ -92,7 +96,7 @@ class AIService
             // Attempt Groq first if configured (ultra-fast Llama 3.3)
             if ($this->groqService->isConfigured()) {
                 try {
-                    $reply = $this->groqService->generateContent($systemPrompt, $history, $message);
+                    $reply = $this->groqService->generateContent($systemPrompt, $history, $userQueryWithContext);
                 } catch (\Exception $e) {
                     Log::error('AIService Groq request error: ' . $e->getMessage());
                     $lastError = $e->getMessage();
@@ -104,7 +108,7 @@ class AIService
                 $geminiKey = config('services.gemini.key', env('GEMINI_API_KEY', ''));
                 if (! empty($geminiKey)) {
                     try {
-                        $reply = $this->geminiService->generateContent($systemPrompt, $history, $message);
+                        $reply = $this->geminiService->generateContent($systemPrompt, $history, $userQueryWithContext);
                     } catch (\Exception $e) {
                         Log::error('AIService Gemini request error: ' . $e->getMessage());
                         $lastError = $e->getMessage();
@@ -144,6 +148,11 @@ class AIService
         }
 
         $msgLower = strtolower($message);
+
+        // System owner recognition
+        if (str_contains($msgLower, 'prasantha')) {
+            return "Prasantha is the system administrator and owner of Vibe Arc Cafe.";
+        }
 
         // API Key instructions for Admins
         if (str_contains($msgLower, 'key') || str_contains($msgLower, 'gemini') || str_contains($msgLower, 'setup')) {
