@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Edit, Grid, LayoutList, Package, Plus, Save, Search, Trash2, RefreshCw, X } from 'lucide-react';
+import { Edit, FolderKanban, Grid, LayoutList, Package, Plus, Save, Search, Trash2, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -211,6 +211,16 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
                                 <Grid className="size-4" />
                             </button>
                         </div>
+
+                        <Link href="/categories">
+                            <Button
+                                variant="outline"
+                                className="h-10 px-3.5 rounded-xl border-border/70 hover:bg-muted font-bold text-xs gap-1.5"
+                            >
+                                <FolderKanban className="size-4 text-blue-600" />
+                                <span>Categories</span>
+                            </Button>
+                        </Link>
 
                         <Button
                             onClick={openCreateModal}
@@ -522,20 +532,41 @@ export default function ProductsIndex({ products, categories = [], filters }: Pr
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-xs font-semibold text-muted-foreground">Category *</label>
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-semibold text-muted-foreground">Category *</label>
+                                    <Link
+                                        href="/categories"
+                                        className="text-[11px] font-semibold text-blue-600 hover:underline"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        + Manage Categories
+                                    </Link>
+                                </div>
                                 <Select
                                     value={data.category_id}
                                     onValueChange={(val) => setData('category_id', val)}
                                 >
                                     <SelectTrigger className="h-10 rounded-xl text-xs">
-                                        <SelectValue placeholder="Select Category" />
+                                        <SelectValue placeholder={categories.length === 0 ? "No active categories available" : "Select Category"} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {categories.map((c) => (
-                                            <SelectItem key={c.id} value={c.id.toString()}>
-                                                {c.name}
-                                            </SelectItem>
-                                        ))}
+                                        {categories.length === 0 ? (
+                                            <div className="p-3 text-center text-xs text-muted-foreground">
+                                                No categories found.
+                                                <div className="mt-1">
+                                                    <Link href="/categories" className="text-blue-600 font-semibold hover:underline">
+                                                        Create a category
+                                                    </Link>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            categories.map((c) => (
+                                                <SelectItem key={c.id} value={c.id.toString()}>
+                                                    {c.name}
+                                                </SelectItem>
+                                            ))
+                                        )}
                                     </SelectContent>
                                 </Select>
                                 {errors.category_id && <p className="text-[11px] text-destructive">{errors.category_id}</p>}

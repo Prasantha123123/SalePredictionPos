@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
@@ -40,6 +41,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Products
     Route::resource('products', ProductController::class)
         ->middleware('can:manage-products');
+
+    // Categories
+    Route::middleware('can:view-categories')->group(function () {
+        Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
+        Route::get('categories/dropdown', [CategoryController::class, 'dropdown'])->name('categories.dropdown');
+    });
+
+    Route::middleware('can:manage-categories')->group(function () {
+        Route::post('categories', [CategoryController::class, 'store'])->name('categories.store');
+        Route::put('categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
+        Route::patch('categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])->name('categories.toggle-status');
+        Route::delete('categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+    });
 
     // Inventory
     Route::get('inventory', [InventoryController::class, 'index'])
@@ -129,14 +143,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('ai-assistant', function () {
         return Inertia\Inertia::render('ai-assistant');
     })->name('ai-assistant.index');
-
-    // Testing & Quality Dashboard (Restricted to Developer)
-    Route::get('testing-dashboard', [App\Http\Controllers\TestingDashboardController::class, 'index'])
-        ->middleware('can:view-testing-dashboard')
-        ->name('testing.dashboard');
-    Route::get('testing-dashboard/export', [App\Http\Controllers\TestingDashboardController::class, 'export'])
-        ->middleware('can:view-testing-dashboard')
-        ->name('testing.export');
 });
 
 require __DIR__.'/settings.php';

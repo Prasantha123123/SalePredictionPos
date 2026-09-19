@@ -28,7 +28,8 @@ class RolePermissionSeeder extends Seeder
             'view-audit-logs',
             'view-suppliers',
             'manage-suppliers',
-            'view-testing-dashboard',
+            'view-categories',
+            'manage-categories',
         ];
 
         foreach ($permissions as $permission) {
@@ -54,6 +55,8 @@ class RolePermissionSeeder extends Seeder
             'view-audit-logs',
             'view-suppliers',
             'manage-suppliers',
+            'view-categories',
+            'manage-categories',
         ]);
 
         $admin = Role::firstOrCreate(['name' => 'Admin']);
@@ -71,6 +74,8 @@ class RolePermissionSeeder extends Seeder
             'view-audit-logs',
             'view-suppliers',
             'manage-suppliers',
+            'view-categories',
+            'manage-categories',
         ]);
 
         $manager = Role::firstOrCreate(['name' => 'Manager']);
@@ -82,6 +87,8 @@ class RolePermissionSeeder extends Seeder
             'manage-customers',
             'view-suppliers',
             'manage-suppliers', // Manager can create/edit suppliers, but cannot delete (we will enforce deletion restriction in the controller)
+            'view-categories',
+            'manage-categories',
         ]);
 
         $inventoryStaff = Role::firstOrCreate(['name' => 'Inventory Staff']);
@@ -89,6 +96,7 @@ class RolePermissionSeeder extends Seeder
             'view-dashboard',
             'manage-inventory',
             'view-suppliers',
+            'view-categories',
         ]);
 
         $cashier = Role::firstOrCreate(['name' => 'Cashier']);

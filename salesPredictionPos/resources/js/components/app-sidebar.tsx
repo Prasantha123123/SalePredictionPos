@@ -71,6 +71,11 @@ const mainNavItems: ExtendedNavItem[] = [
         icon: Package,
     },
     {
+        title: 'Categories',
+        href: '/categories',
+        icon: FolderKanban,
+    },
+    {
         title: 'Inventory',
         href: '/inventory',
         icon: Box,

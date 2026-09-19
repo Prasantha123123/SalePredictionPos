@@ -38,6 +38,7 @@ class RbacMatrixTest extends TestCase
         $this->get(route('users.index'))->assertOk();
         $this->get(route('expenses.index'))->assertOk();
         $this->get(route('suppliers.index'))->assertOk();
+        $this->get(route('categories.index'))->assertOk();
     }
 
     public function test_admin_has_operational_access(): void
@@ -54,6 +55,7 @@ class RbacMatrixTest extends TestCase
         $this->get(route('users.index'))->assertOk();
         $this->get(route('expenses.index'))->assertOk();
         $this->get(route('suppliers.index'))->assertOk();
+        $this->get(route('categories.index'))->assertOk();
     }
 
     public function test_manager_access_and_restrictions(): void
@@ -68,6 +70,7 @@ class RbacMatrixTest extends TestCase
         $this->get(route('expenses.index'))->assertOk();
         $this->get(route('suppliers.index'))->assertOk();
         $this->get(route('customers.index'))->assertOk();
+        $this->get(route('categories.index'))->assertOk();
 
         // Forbidden
         $this->get(route('pos.index'))->assertForbidden();
@@ -85,6 +88,7 @@ class RbacMatrixTest extends TestCase
         $this->get(route('dashboard'))->assertOk();
         $this->get(route('inventory.index'))->assertOk();
         $this->get(route('suppliers.index'))->assertOk();
+        $this->get(route('categories.index'))->assertOk();
 
         // Forbidden
         $this->get(route('pos.index'))->assertForbidden();
@@ -107,6 +111,7 @@ class RbacMatrixTest extends TestCase
         $this->get(route('customers.index'))->assertOk();
 
         // Forbidden
+        $this->get(route('categories.index'))->assertForbidden();
         $this->get(route('products.index'))->assertForbidden();
         $this->get(route('inventory.index'))->assertForbidden();
         $this->get(route('reports.index'))->assertForbidden();
@@ -114,16 +119,5 @@ class RbacMatrixTest extends TestCase
         $this->get(route('users.index'))->assertForbidden();
         $this->get(route('expenses.index'))->assertForbidden();
         $this->get(route('suppliers.index'))->assertForbidden();
-    }
-
-    public function test_developer_has_testing_dashboard_access_and_admin_forbidden(): void
-    {
-        $dev = $this->createUserWithRole('Developer');
-        $this->actingAs($dev);
-        $this->get(route('testing.dashboard'))->assertOk();
-
-        $admin = $this->createUserWithRole('Admin');
-        $this->actingAs($admin);
-        $this->get(route('testing.dashboard'))->assertForbidden();
     }
 }

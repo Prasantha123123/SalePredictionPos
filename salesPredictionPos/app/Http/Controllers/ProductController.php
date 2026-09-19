@@ -12,6 +12,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 use App\Models\InventoryBatch;
+use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
@@ -70,7 +71,11 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'sku' => 'required|string|max:50|unique:products,sku',
             'barcode' => 'nullable|string|max:50|unique:products,barcode',
-            'category_id' => 'required|exists:categories,id',
+            'category_id' => [
+                'required',
+                'integer',
+                Rule::exists('categories', 'id')->where('is_active', true),
+            ],
             'price' => 'required|numeric|min:0',
             'cost' => 'required|numeric|min:0',
             'description' => 'nullable|string|max:1000',
@@ -125,9 +130,14 @@ class ProductController extends Controller
 
     public function edit(Product $product): Response
     {
+        $categories = Category::where('is_active', true)
+            ->orWhere('id', $product->category_id)
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('products/edit', [
             'product' => $product->load('inventory'),
-            'categories' => Category::where('is_active', true)->get(),
+            'categories' => $categories,
         ]);
     }
 

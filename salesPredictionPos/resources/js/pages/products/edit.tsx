@@ -4,6 +4,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 interface Category {
     id: number;
     name: string;
+    is_active?: boolean;
 }
 
 interface Product {
@@ -76,10 +77,19 @@ export default function ProductEdit({ product, categories }: Props) {
                             </div>
 
                             <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Category *</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category *</label>
+                                    <Link href="/categories" className="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+                                        + Manage Categories
+                                    </Link>
+                                </div>
                                 <select value={data.category_id} onChange={(e) => setData('category_id', e.target.value)}
                                     className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
-                                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    {categories.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.name} {c.is_active === false ? '(Inactive)' : ''}
+                                        </option>
+                                    ))}
                                 </select>
                                 {errors.category_id && <p className="mt-1 text-xs text-red-500">{errors.category_id}</p>}
                             </div>

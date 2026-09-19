@@ -1,7 +1,6 @@
 import { Form, Head } from '@inertiajs/react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
-import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -9,16 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthSplitLayout from '@/layouts/auth/auth-split-layout';
 import { store } from '@/routes/login';
-import { request } from '@/routes/password';
 import { motion } from 'framer-motion';
 import { Lock, Mail } from 'lucide-react';
 
 type Props = {
     status?: string;
-    canResetPassword: boolean;
 };
 
-export default function Login({ status, canResetPassword }: Props) {
+export default function Login({ status }: Props) {
     return (
         <AuthSplitLayout
             title="Welcome back"
@@ -68,20 +65,9 @@ export default function Login({ status, canResetPassword }: Props) {
 
                             {/* Password Input */}
                             <div className="grid gap-2">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="password" className="text-xs font-semibold text-foreground/80">
-                                        Password
-                                    </Label>
-                                    {canResetPassword && (
-                                        <TextLink
-                                            href={request()}
-                                            className="text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
-                                            tabIndex={5}
-                                        >
-                                            Forgot password?
-                                        </TextLink>
-                                    )}
-                                </div>
+                                <Label htmlFor="password" className="text-xs font-semibold text-foreground/80">
+                                    Password
+                                </Label>
                                 <div className="relative">
                                     <PasswordInput
                                         id="password"
@@ -126,65 +112,6 @@ export default function Login({ status, canResetPassword }: Props) {
                                     <span>Sign in to Dashboard</span>
                                 )}
                             </Button>
-
-                            {/* Quick Role Fill Buttons */}
-                            <div className="mt-2 pt-4 border-t border-border/60">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Quick Sign-In</span>
-                                    <span className="text-[10px] text-muted-foreground">Select role to auto-fill</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const emailInput = document.getElementById('email') as HTMLInputElement;
-                                            const passInput = document.getElementById('password') as HTMLInputElement;
-                                            if (emailInput) {
-                                                emailInput.value = 'admin@smartpos.lk';
-                                                emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                                emailInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                            }
-                                            if (passInput) {
-                                                passInput.value = 'password';
-                                                passInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                                passInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                            }
-                                        }}
-                                        className="flex items-center gap-2 p-2.5 rounded-xl border border-border/70 hover:border-blue-500/50 bg-muted/20 hover:bg-muted/40 text-left transition-all group cursor-pointer"
-                                    >
-                                        <div className="size-2 rounded-full bg-blue-500 shrink-0" />
-                                        <div className="truncate">
-                                            <p className="text-xs font-semibold leading-tight text-foreground/90">System Admin</p>
-                                            <p className="text-[10px] text-muted-foreground truncate">admin@smartpos.lk</p>
-                                        </div>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const emailInput = document.getElementById('email') as HTMLInputElement;
-                                            const passInput = document.getElementById('password') as HTMLInputElement;
-                                            if (emailInput) {
-                                                emailInput.value = 'developer@smartpos.lk';
-                                                emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                                emailInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                            }
-                                            if (passInput) {
-                                                passInput.value = 'password';
-                                                passInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                                passInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                            }
-                                        }}
-                                        className="flex items-center gap-2 p-2.5 rounded-xl border border-purple-500/40 hover:border-purple-500 bg-purple-500/5 hover:bg-purple-500/10 text-left transition-all group cursor-pointer"
-                                    >
-                                        <div className="size-2 rounded-full bg-purple-500 shrink-0 animate-pulse" />
-                                        <div className="truncate">
-                                            <p className="text-xs font-semibold leading-tight text-purple-600 dark:text-purple-400">Developer</p>
-                                            <p className="text-[10px] text-muted-foreground truncate">QA Hub & Dev Mode</p>
-                                        </div>
-                                    </button>
-                                </div>
-                            </div>
                         </div>
                     </>
                 )}
