@@ -98,42 +98,61 @@ class AIService
             $relevantContext = $dataContext ?: $context;
             $userQueryWithContext = "Context:\n" . trim($relevantContext) . "\n\nQuestion: " . $message;
 
-            // 5. Dispatch to AI Services (Groq -> Gemini -> Offline Fallback)
+            // 5. Dispatch to AI Services (Gemini Primary -> Groq Fallback -> Offline Mock)
             $history = $this->conversationManager->getHistory();
             $reply = null;
+            $providerUsed = null;
             $lastError = null;
 
-            // Attempt Groq first if configured (ultra-fast Llama 3.3)
-            if ($this->groqService->isConfigured()) {
+            // Step 1: Attempt Gemini as Primary Provider
+            $geminiKey = config('services.gemini.key', env('GEMINI_API_KEY', ''));
+            if (! empty($geminiKey)) {
                 try {
-                    $reply = $this->groqService->generateContent($systemPrompt, $history, $userQueryWithContext);
-                } catch (\Exception $e) {
-                    Log::error('AIService Groq request error: ' . $e->getMessage());
-                    $lastError = $e->getMessage();
-                }
-            }
-
-            // Attempt Gemini if Groq was not configured or failed
-            if ($reply === null) {
-                $geminiKey = config('services.gemini.key', env('GEMINI_API_KEY', ''));
-                if (! empty($geminiKey)) {
-                    try {
-                        $reply = $this->geminiService->generateContent($systemPrompt, $history, $userQueryWithContext);
-                    } catch (\Exception $e) {
-                        Log::error('AIService Gemini request error: ' . $e->getMessage());
-                        $lastError = $e->getMessage();
+                    Log::info('[AIService] Attempting primary provider: Gemini...');
+                    $rawReply = $this->geminiService->generateContent($systemPrompt, $history, $userQueryWithContext);
+                    $cleaned = self::sanitizeResponse($rawReply);
+                    if (! empty($cleaned)) {
+                        $reply = $cleaned;
+                        $providerUsed = 'Gemini';
+                        Log::info('[AIService] Responded successfully via Gemini. (Provider: Gemini)');
                     }
+                } catch (\Exception $e) {
+                    Log::warning("[AIService] Gemini provider failed: {$e->getMessage()}. Falling back to Groq...");
+                    $lastError = 'Gemini: ' . $e->getMessage();
+                }
+            } else {
+                Log::info('[AIService] Gemini API key not configured. Proceeding to Groq fallback.');
+            }
+
+            // Step 2: Attempt Groq as Fallback Provider (or Primary if Gemini not configured)
+            if ($reply === null && $this->groqService->isConfigured()) {
+                try {
+                    Log::info('[AIService] Attempting fallback provider: Groq...');
+                    $rawReply = $this->groqService->generateContent($systemPrompt, $history, $userQueryWithContext);
+                    $cleaned = self::sanitizeResponse($rawReply);
+                    if (! empty($cleaned)) {
+                        $reply = $cleaned;
+                        $providerUsed = 'Groq';
+                        Log::info('[AIService] Responded successfully via Groq fallback. (Provider: Groq)');
+                    }
+                } catch (\Exception $e) {
+                    Log::error("[AIService] Groq provider failed: {$e->getMessage()}");
+                    $lastError = ($lastError ? $lastError . ' | ' : '') . 'Groq: ' . $e->getMessage();
                 }
             }
 
-            // Fallback to offline mock response if both failed or no keys configured
+            // Step 3: Fallback to offline rule-based mock response if both failed or no keys configured
             if ($reply === null) {
+                Log::error("[AIService] Both Gemini and Groq failed. Falling back to offline mode. Last error: " . ($lastError ?? 'unknown'));
                 $reply = $this->mockAiFallback($message, $primaryRole, $context, $lastError, $dataContext);
             }
         } catch (\Exception $e) {
-            Log::error('AIService context building error: ' . $e->getMessage());
+            Log::error('[AIService] Context building / processing error: ' . $e->getMessage());
             $reply = $this->mockAiFallback($message, $primaryRole, '', $e->getMessage());
         }
+
+        // Final sanitation check on reply before caching and returning
+        $reply = self::sanitizeResponse($reply);
 
         // Save conversation context
         $this->conversationManager->appendHistory('user', $message);
@@ -145,6 +164,59 @@ class AIService
         cache()->put($cacheKey, $reply, now()->addMinutes($cacheTtl));
 
         return $reply;
+    }
+
+    /**
+     * Clean and sanitize LLM response:
+     * - Strips <think>...</think> and <thought>...</thought> tags (DeepSeek-R1, reasoning models)
+     * - Strips raw scratchpad / chain-of-thought traces
+     * - Trims excess whitespace and outer wrapping quotes
+     */
+    public static function sanitizeResponse(?string $text): string
+    {
+        if (empty($text)) {
+            return '';
+        }
+
+        // 1. Strip <think>...</think> and <thought>...</thought> tags
+        $cleaned = preg_replace('/<(think|thought)[^>]*>[\s\S]*?<\/\1>/i', '', $text);
+
+        // 2. Handle unmatched opening <think> tags (if output was truncated while thinking)
+        $cleaned = preg_replace('/<(think|thought)[^>]*>[\s\S]*$/i', '', $cleaned);
+
+        // 3. Handle raw scratchpad / chain-of-thought traces (e.g. "* User says...", "* Since the user...")
+        if (preg_match('/(\*\s*(User says|Since the user|Wait,\s*the user|Role:|Constraints:|The user|The assistant)|reasoning:|^The user said|^The user is)/im', $cleaned)) {
+            $lines = preg_split('/\r\n|\r|\n/', trim($cleaned));
+            $cleanLines = [];
+
+            for ($i = count($lines) - 1; $i >= 0; $i--) {
+                $line = trim($lines[$i]);
+                if (empty($line)) continue;
+
+                if (preg_match('/^[\*\-]?\s*"([^"]+)"(?:\s*(?:or|fits).*|$)/i', $line, $m)) {
+                    $cleanLines[] = $m[1];
+                    break;
+                }
+
+                if (preg_match('/^([\*\-]\s*)?(User says|Since the user|Wait,\s*the user|Role|User Identity|Goal|Constraints|The user|The assistant|Output ONLY|1-3 sentences|No reasoning|A simple|Maintain a|Offer assistance|Acknowledge)/i', $line)) {
+                    continue;
+                }
+
+                $cleanLines[] = ltrim($line, "*- \t");
+            }
+
+            if (!empty($cleanLines)) {
+                $cleaned = implode("\n", array_reverse($cleanLines));
+            }
+        }
+
+        $cleaned = trim($cleaned);
+
+        if (str_starts_with($cleaned, '"') && str_ends_with($cleaned, '"') && substr_count($cleaned, '"') === 2) {
+            $cleaned = trim($cleaned, '"');
+        }
+
+        return $cleaned;
     }
 
     /**

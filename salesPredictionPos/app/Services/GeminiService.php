@@ -9,14 +9,21 @@ class GeminiService
 {
     protected string $apiKey;
     protected string $model;
-    protected string $fallbackModel = 'gemini-2.0-flash-lite';
-    protected string $endpointUrl = 'https://generativelanguage.googleapis.com/v1beta/models/';
-    protected int $timeoutSeconds = 25;
+    protected string $apiVersion;
+    protected string $endpointUrl;
+    protected array $fallbackModels = [
+        'gemini-2.0-flash',
+        'gemini-3.6-flash',
+        'gemini-2.5-flash',
+    ];
+    protected int $timeoutSeconds = 20;
 
     public function __construct()
     {
-        $this->apiKey = config('services.gemini.key', env('GEMINI_API_KEY', ''));
-        $this->model  = config('services.gemini.model', 'gemini-3.6-flash');
+        $this->apiKey     = config('services.gemini.key', env('GEMINI_API_KEY', ''));
+        $this->model      = config('services.gemini.model', env('GEMINI_MODEL', 'gemini-2.0-flash'));
+        $this->apiVersion = config('services.gemini.api_version', env('GEMINI_API_VERSION', 'v1beta'));
+        $this->endpointUrl = "https://generativelanguage.googleapis.com/{$this->apiVersion}/models/";
     }
 
     /**
@@ -25,59 +32,58 @@ class GeminiService
     public function generateContent(string $systemPrompt, array $history, string $currentMessage): string
     {
         if (empty($this->apiKey)) {
-            Log::warning('Google Gemini API Key is missing.');
+            Log::warning('[GeminiService] Google Gemini API Key is missing.');
             throw new \RuntimeException('Gemini API key is not configured.');
         }
 
         $payload = $this->buildPayload($systemPrompt, $history, $currentMessage);
 
-        // Only gemini-3.6-flash is confirmed available with this API key.
-        // 503 = temporary high demand — retry up to 2 times with a short delay.
-        $models = [
-            ['name' => $this->model, 'timeout' => 15],
-        ];
+        // Build list of models to try: primary model first, followed by fallbacks
+        $modelsToTry = array_values(array_unique(array_filter(
+            array_merge([$this->model], $this->fallbackModels)
+        )));
 
-        foreach ($models as $index => $modelConfig) {
-            $modelName    = $modelConfig['name'];
-            $modelTimeout = $modelConfig['timeout'];
+        $lastEx = null;
 
-            // Retry up to 3 attempts on 503 (high demand / transient)
+        foreach ($modelsToTry as $index => $modelName) {
             $attempts   = 0;
-            $maxRetries = 3;
-            $lastEx     = null;
+            $maxRetries = 2;
 
             while ($attempts < $maxRetries) {
                 $attempts++;
                 try {
-                    $result = $this->callApi($modelName, $payload, $modelTimeout);
+                    $result = $this->callApi($modelName, $payload, $this->timeoutSeconds);
                     if ($result !== null) {
-                        return $result;
+                        return self::sanitizeResponse($result);
                     }
                 } catch (\RuntimeException $e) {
                     $lastEx = $e;
+
                     // Retry only on transient 503 errors
                     if ($attempts < $maxRetries && str_contains($e->getMessage(), 'Service Unavailable')) {
-                        Log::warning("Gemini '{$modelName}' 503 attempt {$attempts}/{$maxRetries}, retrying in 1s...");
+                        Log::warning("[GeminiService] Model '{$modelName}' 503 attempt {$attempts}/{$maxRetries}, retrying in 1s...");
                         sleep(1);
                         continue;
                     }
-                    // Non-retriable error or max retries reached
+
+                    // On 404 Not Found (e.g. deprecated model name), immediately switch to next model
+                    if (str_contains($e->getMessage(), 'Model Not Found') || str_contains($e->getMessage(), '404')) {
+                        Log::warning("[GeminiService] Model '{$modelName}' not found (404). Trying next fallback model.");
+                        break;
+                    }
+
+                    // Other non-retriable errors
                     break;
                 }
             }
 
-            if ($lastEx !== null) {
-                $isLast = ($index === array_key_last($models));
-                if (!$isLast) {
-                    $nextModel = $models[$index + 1]['name'];
-                    Log::warning("Gemini model '{$modelName}' failed after {$attempts} attempts: {$lastEx->getMessage()}. Trying '{$nextModel}'.");
-                    continue;
-                }
-                throw $lastEx;
+            if ($lastEx !== null && $index < count($modelsToTry) - 1) {
+                $nextModel = $modelsToTry[$index + 1];
+                Log::warning("[GeminiService] Model '{$modelName}' failed ({$lastEx->getMessage()}). Falling back to '{$nextModel}'.");
             }
         }
 
-        throw new \RuntimeException('Gemini API is temporarily unavailable. Please try again in a moment.');
+        throw $lastEx ?? new \RuntimeException('Gemini API is temporarily unavailable.');
     }
 
     /**
@@ -160,14 +166,14 @@ class GeminiService
         if ($status >= 200 && $status < 300) {
             $reply = $data['candidates'][0]['content']['parts'][0]['text'] ?? null;
             if (! empty($reply)) {
-                Log::info("Gemini AI response generated successfully using model: {$model}");
-                return $reply;
+                Log::info("[GeminiService] AI response generated successfully using model: {$model}");
+                return self::sanitizeResponse($reply);
             }
-            Log::warning('Gemini API returned an empty candidate content payload.');
+            Log::warning('[GeminiService] API returned an empty candidate content payload.');
             throw new \RuntimeException('Gemini API returned empty text response.');
         }
 
-        Log::error("Gemini API Request failed. Model: {$model}. Status: {$status}. Body: {$body}");
+        Log::error("[GeminiService] API Request failed. Model: {$model}. Status: {$status}. Body: {$body}");
 
         $msg = match ($status) {
             401 => 'Unauthorized: Please verify your GEMINI_API_KEY is correct.',
@@ -179,5 +185,58 @@ class GeminiService
         };
 
         throw new \RuntimeException($msg);
+    }
+
+    /**
+     * Clean and sanitize LLM response:
+     * - Strips <think>...</think> and <thought>...</thought> tags (DeepSeek-R1, reasoning models)
+     * - Strips raw scratchpad / chain-of-thought traces (bullet deliberations)
+     * - Trims excess whitespace and outer wrapping quotes
+     */
+    public static function sanitizeResponse(?string $text): string
+    {
+        if (empty($text)) {
+            return '';
+        }
+
+        // 1. Strip <think>...</think> and <thought>...</thought> tags
+        $cleaned = preg_replace('/<(think|thought)[^>]*>[\s\S]*?<\/\1>/i', '', $text);
+
+        // 2. Handle unmatched opening <think> tags (if output was truncated while thinking)
+        $cleaned = preg_replace('/<(think|thought)[^>]*>[\s\S]*$/i', '', $cleaned);
+
+        // 3. Handle raw scratchpad / chain-of-thought traces
+        if (preg_match('/(\*\s*(User says|Since the user|Wait,\s*the user|Role:|Constraints:|The user|The assistant)|reasoning:|^The user said|^The user is)/im', $cleaned)) {
+            $lines = preg_split('/\r\n|\r|\n/', trim($cleaned));
+            $cleanLines = [];
+
+            for ($i = count($lines) - 1; $i >= 0; $i--) {
+                $line = trim($lines[$i]);
+                if (empty($line)) continue;
+
+                if (preg_match('/^[\*\-]?\s*"([^"]+)"(?:\s*(?:or|fits).*|$)/i', $line, $m)) {
+                    $cleanLines[] = $m[1];
+                    break;
+                }
+
+                if (preg_match('/^([\*\-]\s*)?(User says|Since the user|Wait,\s*the user|Role|User Identity|Goal|Constraints|The user|The assistant|Output ONLY|1-3 sentences|No reasoning|A simple|Maintain a|Offer assistance|Acknowledge)/i', $line)) {
+                    continue;
+                }
+
+                $cleanLines[] = ltrim($line, "*- \t");
+            }
+
+            if (!empty($cleanLines)) {
+                $cleaned = implode("\n", array_reverse($cleanLines));
+            }
+        }
+
+        $cleaned = trim($cleaned);
+
+        if (str_starts_with($cleaned, '"') && str_ends_with($cleaned, '"') && substr_count($cleaned, '"') === 2) {
+            $cleaned = trim($cleaned, '"');
+        }
+
+        return $cleaned;
     }
 }

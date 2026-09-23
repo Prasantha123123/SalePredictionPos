@@ -7,13 +7,12 @@ use Illuminate\Support\Facades\Log;
 class GroqService
 {
     protected string $apiKey;
-    // Active Groq models (as of 2025 — updated from deprecated llama-3.3-70b-versatile)
-    protected string $model = 'llama-3.3-70b-versatile';
+    protected string $model;
     protected array $fallbackModels = [
-        'llama-3.1-70b-versatile',
-        'llama-3.1-8b-instant',
-        'meta-llama/llama-4-scout-17b-16e-instruct',
-        'meta-llama/llama-4-maverick-17b-128e-instruct',
+        'openai/gpt-oss-120b',
+        'openai/gpt-oss-20b',
+        'deepseek-r1-distill-llama-70b',
+        'llama-3.3-70b-versatile',
     ];
     protected string $endpointUrl = 'https://api.groq.com/openai/v1/chat/completions';
     protected int $timeoutSeconds = 15;
@@ -21,6 +20,7 @@ class GroqService
     public function __construct()
     {
         $this->apiKey = config('services.groq.key', env('GROQ_API_KEY', ''));
+        $this->model  = config('services.groq.model', env('GROQ_MODEL', 'qwen/qwen3.8-27b'));
     }
 
     public function isConfigured(): bool
@@ -52,8 +52,10 @@ class GroqService
         $messages[] = ['role' => 'user', 'content' => $currentMessage];
 
         // Try primary model first, then fallbacks in order
-        $modelsToTry = array_merge([$this->model], $this->fallbackModels);
-        $lastError    = null;
+        $modelsToTry = array_values(array_unique(array_filter(
+            array_merge([$this->model], $this->fallbackModels)
+        )));
+        $lastError   = null;
 
         foreach ($modelsToTry as $modelName) {
             $payload = json_encode([
@@ -83,7 +85,7 @@ class GroqService
             curl_close($ch);
 
             if ($curlError) {
-                Log::warning("Groq model '{$modelName}' curl error: {$curlError}");
+                Log::warning("[GroqService] Model '{$modelName}' curl error: {$curlError}");
                 $lastError = 'Groq Connection Timeout: Please verify your network status.';
                 continue;
             }
@@ -93,8 +95,8 @@ class GroqService
             if ($status >= 200 && $status < 300) {
                 $reply = $data['choices'][0]['message']['content'] ?? null;
                 if (! empty($reply)) {
-                    Log::info("Groq AI response generated successfully using model: {$modelName}");
-                    return trim($reply);
+                    Log::info("[GroqService] AI response generated successfully using model: {$modelName}");
+                    return self::sanitizeResponse($reply);
                 }
                 $lastError = 'Groq API returned an empty response.';
                 continue;
@@ -102,25 +104,72 @@ class GroqService
 
             $errMsg = $data['error']['message'] ?? "HTTP {$status}";
 
-            // 404 / decommissioned — try next model silently
+            // 404 / decommissioned / not found — try next model silently
             if ($status === 404 || str_contains($errMsg, 'decommissioned') || str_contains($errMsg, 'does not exist')) {
-                Log::warning("Groq model '{$modelName}' not available, trying next: {$errMsg}");
+                Log::warning("[GroqService] Model '{$modelName}' not available, trying next: {$errMsg}");
                 $lastError = $errMsg;
                 continue;
             }
 
-            // Hard errors — stop immediately
-            Log::error("Groq API Request failed. Status: {$status}. Model: {$modelName}. Error: {$errMsg}");
-            $msg = match ($status) {
-                401 => 'Groq Unauthorized: Please verify your GROQ_API_KEY is correct.',
-                429 => 'Groq Rate Limit: You have hit the Groq query quota. Please wait a moment.',
-                500, 503 => 'Groq Service Unavailable: Please try again later.',
-                default   => "Groq API Error ({$status}): {$errMsg}",
-            };
-            throw new \RuntimeException($msg);
+            // Hard errors — log and try next if available
+            Log::error("[GroqService] Request failed. Status: {$status}. Model: {$modelName}. Error: {$errMsg}");
+            $lastError = $errMsg;
         }
 
         // All models exhausted
         throw new \RuntimeException('All Groq models are unavailable. Last error: ' . ($lastError ?? 'unknown'));
+    }
+
+    /**
+     * Clean and sanitize LLM response:
+     * - Strips <think>...</think> and <thought>...</thought> tags (DeepSeek-R1, reasoning models)
+     * - Strips raw scratchpad / chain-of-thought traces
+     * - Trims excess whitespace and outer wrapping quotes
+     */
+    public static function sanitizeResponse(?string $text): string
+    {
+        if (empty($text)) {
+            return '';
+        }
+
+        // 1. Strip <think>...</think> and <thought>...</thought> tags
+        $cleaned = preg_replace('/<(think|thought)[^>]*>[\s\S]*?<\/\1>/i', '', $text);
+
+        // 2. Handle unmatched opening <think> tags (if output was truncated while thinking)
+        $cleaned = preg_replace('/<(think|thought)[^>]*>[\s\S]*$/i', '', $cleaned);
+
+        // 3. Handle raw scratchpad / chain-of-thought traces
+        if (preg_match('/(\*\s*(User says|Since the user|Wait,\s*the user|Role:|Constraints:|The user|The assistant)|reasoning:|^The user said|^The user is)/im', $cleaned)) {
+            $lines = preg_split('/\r\n|\r|\n/', trim($cleaned));
+            $cleanLines = [];
+
+            for ($i = count($lines) - 1; $i >= 0; $i--) {
+                $line = trim($lines[$i]);
+                if (empty($line)) continue;
+
+                if (preg_match('/^[\*\-]?\s*"([^"]+)"(?:\s*(?:or|fits).*|$)/i', $line, $m)) {
+                    $cleanLines[] = $m[1];
+                    break;
+                }
+
+                if (preg_match('/^([\*\-]\s*)?(User says|Since the user|Wait,\s*the user|Role|User Identity|Goal|Constraints|The user|The assistant|Output ONLY|1-3 sentences|No reasoning|A simple|Maintain a|Offer assistance|Acknowledge)/i', $line)) {
+                    continue;
+                }
+
+                $cleanLines[] = ltrim($line, "*- \t");
+            }
+
+            if (!empty($cleanLines)) {
+                $cleaned = implode("\n", array_reverse($cleanLines));
+            }
+        }
+
+        $cleaned = trim($cleaned);
+
+        if (str_starts_with($cleaned, '"') && str_ends_with($cleaned, '"') && substr_count($cleaned, '"') === 2) {
+            $cleaned = trim($cleaned, '"');
+        }
+
+        return $cleaned;
     }
 }

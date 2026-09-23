@@ -40,12 +40,14 @@ return [
     ],
 
     'gemini' => [
-        'key'   => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-3.6-flash'),
+        'key'         => env('GEMINI_API_KEY'),
+        'model'       => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+        'api_version' => env('GEMINI_API_VERSION', 'v1beta'),
     ],
 
     'groq' => [
-        'key' => env('GROQ_API_KEY'),
+        'key'   => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'qwen/qwen3.8-27b'),
     ],
 
     'curl_ssl_verify' => env('CURL_SSL_VERIFY', false),
