@@ -7,7 +7,14 @@ use Illuminate\Support\Facades\Log;
 class GroqService
 {
     protected string $apiKey;
+    // Active Groq models (as of 2025 — updated from deprecated llama-3.3-70b-versatile)
     protected string $model = 'llama-3.3-70b-versatile';
+    protected array $fallbackModels = [
+        'llama-3.1-70b-versatile',
+        'llama-3.1-8b-instant',
+        'meta-llama/llama-4-scout-17b-16e-instruct',
+        'meta-llama/llama-4-maverick-17b-128e-instruct',
+    ];
     protected string $endpointUrl = 'https://api.groq.com/openai/v1/chat/completions';
     protected int $timeoutSeconds = 15;
 
@@ -44,58 +51,76 @@ class GroqService
 
         $messages[] = ['role' => 'user', 'content' => $currentMessage];
 
-        $payload = json_encode([
-            'model'       => $this->model,
-            'messages'    => $messages,
-            'temperature' => 0.3,
-            'max_tokens'  => 150,
-        ]);
+        // Try primary model first, then fallbacks in order
+        $modelsToTry = array_merge([$this->model], $this->fallbackModels);
+        $lastError    = null;
 
-        $ch = curl_init($this->endpointUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                "Authorization: Bearer {$this->apiKey}",
-            ],
-            CURLOPT_SSL_VERIFYPEER => config('services.curl_ssl_verify', app()->isProduction()),
-            CURLOPT_TIMEOUT        => $this->timeoutSeconds,
-            CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-        ]);
+        foreach ($modelsToTry as $modelName) {
+            $payload = json_encode([
+                'model'       => $modelName,
+                'messages'    => $messages,
+                'temperature' => 0.3,
+                'max_tokens'  => 512,
+            ]);
 
-        $body     = curl_exec($ch);
-        $status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
+            $ch = curl_init($this->endpointUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $payload,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    "Authorization: Bearer {$this->apiKey}",
+                ],
+                CURLOPT_SSL_VERIFYPEER => config('services.curl_ssl_verify', app()->isProduction()),
+                CURLOPT_TIMEOUT        => $this->timeoutSeconds,
+                CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
+            ]);
 
-        if ($curlError) {
-            Log::error("Groq API Connection Error: {$curlError}");
-            throw new \RuntimeException('Groq Connection Timeout: Please verify your network status.');
-        }
+            $body      = curl_exec($ch);
+            $status    = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
 
-        $data = json_decode($body, true);
-
-        if ($status >= 200 && $status < 300) {
-            $reply = $data['choices'][0]['message']['content'] ?? null;
-            if (! empty($reply)) {
-                Log::info("Groq AI response generated successfully using model: {$this->model}");
-                return trim($reply);
+            if ($curlError) {
+                Log::warning("Groq model '{$modelName}' curl error: {$curlError}");
+                $lastError = 'Groq Connection Timeout: Please verify your network status.';
+                continue;
             }
-            throw new \RuntimeException('Groq API returned an empty response.');
+
+            $data = json_decode($body, true);
+
+            if ($status >= 200 && $status < 300) {
+                $reply = $data['choices'][0]['message']['content'] ?? null;
+                if (! empty($reply)) {
+                    Log::info("Groq AI response generated successfully using model: {$modelName}");
+                    return trim($reply);
+                }
+                $lastError = 'Groq API returned an empty response.';
+                continue;
+            }
+
+            $errMsg = $data['error']['message'] ?? "HTTP {$status}";
+
+            // 404 / decommissioned — try next model silently
+            if ($status === 404 || str_contains($errMsg, 'decommissioned') || str_contains($errMsg, 'does not exist')) {
+                Log::warning("Groq model '{$modelName}' not available, trying next: {$errMsg}");
+                $lastError = $errMsg;
+                continue;
+            }
+
+            // Hard errors — stop immediately
+            Log::error("Groq API Request failed. Status: {$status}. Model: {$modelName}. Error: {$errMsg}");
+            $msg = match ($status) {
+                401 => 'Groq Unauthorized: Please verify your GROQ_API_KEY is correct.',
+                429 => 'Groq Rate Limit: You have hit the Groq query quota. Please wait a moment.',
+                500, 503 => 'Groq Service Unavailable: Please try again later.',
+                default   => "Groq API Error ({$status}): {$errMsg}",
+            };
+            throw new \RuntimeException($msg);
         }
 
-        $errMsg = $data['error']['message'] ?? "HTTP {$status}";
-        Log::error("Groq API Request failed. Status: {$status}. Error: {$errMsg}");
-
-        $msg = match ($status) {
-            401 => 'Groq Unauthorized: Please verify your GROQ_API_KEY is correct.',
-            429 => 'Groq Rate Limit: You have hit the Groq query quota. Please wait a moment.',
-            500, 503 => 'Groq Service Unavailable: Please try again later.',
-            default => "Groq API Error ({$status}): {$errMsg}",
-        };
-
-        throw new \RuntimeException($msg);
+        // All models exhausted
+        throw new \RuntimeException('All Groq models are unavailable. Last error: ' . ($lastError ?? 'unknown'));
     }
 }

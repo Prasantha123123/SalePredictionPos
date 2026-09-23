@@ -55,13 +55,23 @@ class AIService
         $primaryRole = ! empty($roles) ? $roles[0] : 'Cashier';
 
         // Check if cached answer exists
-        $cacheKey = 'ai_query_' . md5($primaryRole . '_' . $message);
+        // Cache key includes role so different roles don't share cached responses
+        $cacheKey = 'ai_query_' . md5($primaryRole . '_' . strtolower(trim($message)));
         if (cache()->has($cacheKey)) {
             $cachedResponse = cache()->get($cacheKey);
             $this->conversationManager->appendHistory('user', $message);
-            $this->conversationManager->appendHistory('assistant', $cachedResponse);
+            $this->conversationManager->appendHistory('assistant', '[cached] ' . $cachedResponse);
+            Log::info("AIService: Cache hit for role={$primaryRole}, key={$cacheKey}");
             return $cachedResponse;
         }
+
+        // Per-user rate limit: max 10 AI requests per minute per user (prevents API abuse in production)
+        $rateLimitKey = 'ai_rate_' . $user->id . '_' . date('YmdHi');
+        $requestCount = (int) cache()->get($rateLimitKey, 0);
+        if ($requestCount >= 10) {
+            return "⚠️ **Rate Limit Reached**: You have sent too many requests in the past minute. Please wait a moment before trying again.";
+        }
+        cache()->put($rateLimitKey, $requestCount + 1, now()->addMinutes(1));
 
         try {
             // 1. Context Construction
@@ -129,8 +139,9 @@ class AIService
         $this->conversationManager->appendHistory('user', $message);
         $this->conversationManager->appendHistory('assistant', $reply);
 
-        // Cache: 2 minutes for data queries (freshness), 5 minutes for general
-        $cacheTtl = ($isDataQuery ?? false) ? 2 : 5;
+        // Cache: 15 min for live data queries (freshness), 60 min for general/static answers
+        // This dramatically reduces API calls in production without stale data issues
+        $cacheTtl = ($isDataQuery ?? false) ? 15 : 60;
         cache()->put($cacheKey, $reply, now()->addMinutes($cacheTtl));
 
         return $reply;

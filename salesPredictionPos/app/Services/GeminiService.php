@@ -9,14 +9,14 @@ class GeminiService
 {
     protected string $apiKey;
     protected string $model;
-    protected string $fallbackModel = 'gemini-2.0-flash';
+    protected string $fallbackModel = 'gemini-2.0-flash-lite';
     protected string $endpointUrl = 'https://generativelanguage.googleapis.com/v1beta/models/';
     protected int $timeoutSeconds = 25;
 
     public function __construct()
     {
         $this->apiKey = config('services.gemini.key', env('GEMINI_API_KEY', ''));
-        $this->model = config('services.gemini.model', 'gemini-2.0-flash');
+        $this->model  = config('services.gemini.model', 'gemini-3.6-flash');
     }
 
     /**
@@ -31,36 +31,53 @@ class GeminiService
 
         $payload = $this->buildPayload($systemPrompt, $history, $currentMessage);
 
-        // Try primary model, then fallback models (gemma works on free keys with 0 Gemini quota)
-        // Per-model timeouts: Gemini models fail fast (8s), Gemma needs more time (25s)
+        // Only gemini-3.6-flash is confirmed available with this API key.
+        // 503 = temporary high demand — retry up to 2 times with a short delay.
         $models = [
-            ['name' => $this->model,         'timeout' => 8],
-            ['name' => $this->fallbackModel,  'timeout' => 8],
-            ['name' => 'gemini-2.0-flash-lite', 'timeout' => 8],
-            ['name' => 'gemma-4-26b-a4b-it',  'timeout' => 25],
+            ['name' => $this->model, 'timeout' => 15],
         ];
 
         foreach ($models as $index => $modelConfig) {
-            $modelName = $modelConfig['name'];
+            $modelName    = $modelConfig['name'];
             $modelTimeout = $modelConfig['timeout'];
-            try {
-                $result = $this->callApi($modelName, $payload, $modelTimeout);
-                if ($result !== null) {
-                    return $result;
+
+            // Retry up to 3 attempts on 503 (high demand / transient)
+            $attempts   = 0;
+            $maxRetries = 3;
+            $lastEx     = null;
+
+            while ($attempts < $maxRetries) {
+                $attempts++;
+                try {
+                    $result = $this->callApi($modelName, $payload, $modelTimeout);
+                    if ($result !== null) {
+                        return $result;
+                    }
+                } catch (\RuntimeException $e) {
+                    $lastEx = $e;
+                    // Retry only on transient 503 errors
+                    if ($attempts < $maxRetries && str_contains($e->getMessage(), 'Service Unavailable')) {
+                        Log::warning("Gemini '{$modelName}' 503 attempt {$attempts}/{$maxRetries}, retrying in 1s...");
+                        sleep(1);
+                        continue;
+                    }
+                    // Non-retriable error or max retries reached
+                    break;
                 }
-            } catch (\Exception $e) {
-                // If this is not the last model in the list, try the next one
+            }
+
+            if ($lastEx !== null) {
                 $isLast = ($index === array_key_last($models));
                 if (!$isLast) {
                     $nextModel = $models[$index + 1]['name'];
-                    Log::warning("Gemini model '{$modelName}' failed: {$e->getMessage()}. Trying fallback '{$nextModel}'.");
+                    Log::warning("Gemini model '{$modelName}' failed after {$attempts} attempts: {$lastEx->getMessage()}. Trying '{$nextModel}'.");
                     continue;
                 }
-                throw $e;
+                throw $lastEx;
             }
         }
 
-        throw new \RuntimeException('All Gemini models failed to generate a response.');
+        throw new \RuntimeException('Gemini API is temporarily unavailable. Please try again in a moment.');
     }
 
     /**
@@ -98,7 +115,7 @@ class GeminiService
             'contents' => $contents,
             'generationConfig' => [
                 'temperature' => 0.3,
-                'maxOutputTokens' => 150,
+                'maxOutputTokens' => 512,
             ]
         ];
     }
