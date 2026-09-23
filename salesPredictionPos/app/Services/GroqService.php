@@ -10,9 +10,10 @@ class GroqService
     // Active Groq models (as of 2025 — updated from deprecated llama-3.3-70b-versatile)
     protected string $model = 'llama-3.3-70b-versatile';
     protected array $fallbackModels = [
+        'llama-3.1-70b-versatile',
         'llama-3.1-8b-instant',
-        'gemma2-9b-it',
-        'mixtral-8x7b-32768',
+        'meta-llama/llama-4-scout-17b-16e-instruct',
+        'meta-llama/llama-4-maverick-17b-128e-instruct',
     ];
     protected string $endpointUrl = 'https://api.groq.com/openai/v1/chat/completions';
     protected int $timeoutSeconds = 15;

@@ -32,11 +32,9 @@ class GeminiService
         $payload = $this->buildPayload($systemPrompt, $history, $currentMessage);
 
         // Only gemini-3.6-flash is confirmed available with this API key.
-        // 503 = temporary high demand — retry up to 3 times with a short delay.
-        // gemma-4-26b-a4b-it confirmed working on production server (log: 12:16:23 SUCCESS)
+        // 503 = temporary high demand — retry up to 2 times with a short delay.
         $models = [
-            ['name' => $this->model,         'timeout' => 15],  // gemini-3.6-flash (primary)
-            ['name' => 'gemma-4-26b-a4b-it', 'timeout' => 30],  // confirmed fallback!
+            ['name' => $this->model, 'timeout' => 15],
         ];
 
         foreach ($models as $index => $modelConfig) {
