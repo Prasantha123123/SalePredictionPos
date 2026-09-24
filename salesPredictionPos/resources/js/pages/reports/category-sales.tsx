@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { TablePagination } from '@/components/ui/table-pagination';
 import AppLayout from '@/layouts/app-layout';
 
 interface CategoryRow {
@@ -36,8 +37,20 @@ interface CategoryRow {
     profit: number;
 }
 
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
 interface Props {
-    categories: CategoryRow[];
+    categories: {
+        data: CategoryRow[];
+        links: PaginationLink[];
+        current_page: number;
+        last_page: number;
+        total: number;
+    };
     filters: { start_date?: string; end_date?: string };
 }
 
@@ -47,7 +60,7 @@ function formatCurrency(val: number) {
     return `Rs. ${Number(val).toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
 }
 
-export default function CategorySalesReport({ categories = [], filters }: Props) {
+export default function CategorySalesReport({ categories, filters }: Props) {
     const [startDate, setStartDate] = useState(filters.start_date || '');
     const [endDate, setEndDate] = useState(filters.end_date || '');
 
@@ -62,7 +75,8 @@ export default function CategorySalesReport({ categories = [], filters }: Props)
         router.get('/reports/category-sales', {}, { preserveState: true });
     };
 
-    const totalRevenue = categories.reduce((sum, c) => sum + c.revenue, 0);
+    const rows = categories?.data ?? [];
+    const totalRevenue = rows.reduce((sum, c) => sum + c.revenue, 0);
 
     return (
         <AppLayout
@@ -78,7 +92,7 @@ export default function CategorySalesReport({ categories = [], filters }: Props)
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-black tracking-tight text-foreground">
-                            Category Sales & Share Breakdown
+                            Category Sales &amp; Share Breakdown
                         </h1>
                         <p className="text-xs text-muted-foreground">
                             Analyze revenue composition and profit contribution per category segment.
@@ -133,8 +147,8 @@ export default function CategorySalesReport({ categories = [], filters }: Props)
                         <div className="h-64 w-full flex items-center justify-center">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie data={categories} dataKey="revenue" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                        {categories.map((_, index) => (
+                                    <Pie data={rows} dataKey="revenue" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                        {rows.map((_, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
@@ -155,7 +169,7 @@ export default function CategorySalesReport({ categories = [], filters }: Props)
                         </div>
                         <div className="h-64 w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={categories} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <BarChart data={rows} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(150,150,150,0.1)" />
                                     <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="gray" />
                                     <YAxis tick={{ fontSize: 10 }} stroke="gray" />
@@ -185,7 +199,7 @@ export default function CategorySalesReport({ categories = [], filters }: Props)
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/40">
-                                {categories.map((c) => {
+                                {rows.map((c) => {
                                     const sharePct = totalRevenue > 0 ? round((c.revenue / totalRevenue) * 100, 1) : 0;
                                     return (
                                         <tr key={c.id} className="hover:bg-muted/30 transition-colors">
@@ -206,6 +220,13 @@ export default function CategorySalesReport({ categories = [], filters }: Props)
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Pagination */}
+                    <TablePagination
+                        links={categories.links}
+                        currentPage={categories.current_page}
+                        lastPage={categories.last_page}
+                    />
                 </div>
             </div>
         </AppLayout>

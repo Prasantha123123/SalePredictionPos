@@ -2,6 +2,7 @@ import { Head } from '@inertiajs/react';
 import { Award, Printer, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TablePagination } from '@/components/ui/table-pagination';
 import AppLayout from '@/layouts/app-layout';
 
 interface CustomerRow {
@@ -15,15 +16,31 @@ interface CustomerRow {
     avg_order: number;
 }
 
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
 interface Props {
-    topCustomers: CustomerRow[];
+    topCustomers: {
+        data: CustomerRow[];
+        links: PaginationLink[];
+        current_page: number;
+        last_page: number;
+        total: number;
+    };
 }
 
 function formatCurrency(val: number) {
     return `Rs. ${Number(val).toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
 }
 
-export default function CustomerReport({ topCustomers = [] }: Props) {
+export default function CustomerReport({ topCustomers }: Props) {
+    const customers = topCustomers?.data ?? [];
+    // Offset rank by page
+    const pageOffset = ((topCustomers?.current_page ?? 1) - 1) * 20;
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -38,7 +55,7 @@ export default function CustomerReport({ topCustomers = [] }: Props) {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-black tracking-tight text-foreground">
-                            Top Customers & Purchasing Habits
+                            Top Customers &amp; Purchasing Habits
                         </h1>
                         <p className="text-xs text-muted-foreground">
                             Identify highest spending clientele, purchase frequency, and loyalty points balances.
@@ -57,7 +74,7 @@ export default function CustomerReport({ topCustomers = [] }: Props) {
                         <table className="w-full text-xs">
                             <thead className="bg-muted/40 border-b border-border/60 text-muted-foreground uppercase font-bold tracking-wider text-[10px]">
                                 <tr>
-                                    <th className="px-4 py-3.5 text-left">Rank & Customer Name</th>
+                                    <th className="px-4 py-3.5 text-left">Rank &amp; Customer Name</th>
                                     <th className="px-4 py-3.5 text-left">Contact Info</th>
                                     <th className="px-4 py-3.5 text-center">Orders Completed</th>
                                     <th className="px-4 py-3.5 text-right">Avg Purchase</th>
@@ -66,14 +83,14 @@ export default function CustomerReport({ topCustomers = [] }: Props) {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/40">
-                                {topCustomers.map((c, i) => (
+                                {customers.map((c, i) => (
                                     <tr key={c.id} className="hover:bg-muted/30 transition-colors">
                                         <td className="px-4 py-3.5 font-bold text-foreground">
                                             <div className="flex items-center gap-2.5">
                                                 <span className={`size-6 rounded-full flex items-center justify-center font-bold text-[10px] ${
-                                                    i === 0 ? 'bg-amber-500 text-white' : i === 1 ? 'bg-slate-400 text-white' : i === 2 ? 'bg-amber-700 text-white' : 'bg-muted text-muted-foreground'
+                                                    pageOffset + i === 0 ? 'bg-amber-500 text-white' : pageOffset + i === 1 ? 'bg-slate-400 text-white' : pageOffset + i === 2 ? 'bg-amber-700 text-white' : 'bg-muted text-muted-foreground'
                                                 }`}>
-                                                    #{i + 1}
+                                                    #{pageOffset + i + 1}
                                                 </span>
                                                 <span>{c.name}</span>
                                             </div>
@@ -95,6 +112,13 @@ export default function CustomerReport({ topCustomers = [] }: Props) {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Pagination */}
+                    <TablePagination
+                        links={topCustomers.links}
+                        currentPage={topCustomers.current_page}
+                        lastPage={topCustomers.last_page}
+                    />
                 </div>
             </div>
         </AppLayout>

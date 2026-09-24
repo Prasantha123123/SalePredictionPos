@@ -2,6 +2,7 @@ import { Head } from '@inertiajs/react';
 import { AlertTriangle, Box, DollarSign, PackageX, Printer, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TablePagination } from '@/components/ui/table-pagination';
 import AppLayout from '@/layouts/app-layout';
 
 interface InventoryItemRow {
@@ -20,7 +21,13 @@ interface InventoryItemRow {
 }
 
 interface Props {
-    inventoryList: InventoryItemRow[];
+    inventoryList: {
+        data: InventoryItemRow[];
+        links: { url: string | null; label: string; active: boolean }[];
+        current_page: number;
+        last_page: number;
+        total: number;
+    };
     summary: {
         currentStock: number;
         lowStock: number;
@@ -34,7 +41,8 @@ function formatCurrency(val: number) {
     return `Rs. ${Number(val).toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
 }
 
-export default function InventoryReport({ inventoryList = [], summary }: Props) {
+export default function InventoryReport({ inventoryList, summary }: Props) {
+    const items = inventoryList?.data ?? [];
     return (
         <AppLayout
             breadcrumbs={[
@@ -108,7 +116,7 @@ export default function InventoryReport({ inventoryList = [], summary }: Props) 
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/40">
-                                {inventoryList.map((item) => (
+                                {items.map((item) => (
                                     <tr key={item.id} className="hover:bg-muted/30 transition-colors">
                                         <td className="px-4 py-3.5 font-bold text-foreground">{item.name}</td>
                                         <td className="px-4 py-3.5 font-mono text-muted-foreground">{item.sku}</td>
@@ -136,6 +144,13 @@ export default function InventoryReport({ inventoryList = [], summary }: Props) 
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Pagination */}
+                    <TablePagination
+                        links={inventoryList.links}
+                        currentPage={inventoryList.current_page}
+                        lastPage={inventoryList.last_page}
+                    />
                 </div>
             </div>
         </AppLayout>

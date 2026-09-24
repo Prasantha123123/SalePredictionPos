@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Expense;
 use App\Models\Inventory;
+use App\Models\InventoryBatch;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
@@ -411,8 +412,10 @@ class ReportController extends Controller
     {
         $startDate = $request->input('start_date', Carbon::now()->subDays(30)->format('Y-m-d'));
         $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
+        $perPage = 15;
+        $page = (int) $request->input('page', 1);
 
-        $categories = Category::withCount('products')
+        $allCategories = Category::withCount('products')
             ->get()
             ->map(function ($cat) use ($startDate, $endDate) {
                 $salesData = SaleItem::join('products', 'sale_items.product_id', '=', 'products.id')
@@ -442,8 +445,28 @@ class ReportController extends Controller
             ->sortByDesc('revenue')
             ->values();
 
+        $total = $allCategories->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $lastPage);
+        $pagedData = $allCategories->slice(($page - 1) * $perPage, $perPage)->values();
+
+        // Build Laravel-style links array for the shared pagination component
+        $links = [];
+        $baseUrl = url('/reports/category-sales') . '?start_date=' . urlencode($startDate) . '&end_date=' . urlencode($endDate);
+        $links[] = ['url' => $page > 1 ? $baseUrl . '&page=' . ($page - 1) : null, 'label' => '&laquo; Previous', 'active' => false];
+        for ($i = 1; $i <= $lastPage; $i++) {
+            $links[] = ['url' => $baseUrl . '&page=' . $i, 'label' => (string) $i, 'active' => $i === $page];
+        }
+        $links[] = ['url' => $page < $lastPage ? $baseUrl . '&page=' . ($page + 1) : null, 'label' => 'Next &raquo;', 'active' => false];
+
         return Inertia::render('reports/category-sales', [
-            'categories' => $categories,
+            'categories' => [
+                'data' => $pagedData,
+                'links' => $links,
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'total' => $total,
+            ],
             'filters' => [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
@@ -463,18 +486,19 @@ class ReportController extends Controller
                 $q->where('status', 'completed');
             }], 'total')
             ->orderByDesc('total_spent')
-            ->limit(20)
-            ->get()
-            ->map(fn ($c) => [
-                'id' => $c->id,
-                'name' => $c->name,
-                'email' => $c->email,
-                'phone' => $c->phone,
-                'loyalty_points' => $c->loyalty_points,
-                'orders_count' => (int) $c->orders_count,
-                'total_spent' => round((float) ($c->total_spent ?? 0), 2),
-                'avg_order' => $c->orders_count > 0 ? round(($c->total_spent ?? 0) / $c->orders_count, 2) : 0,
-            ]);
+            ->paginate(20)
+            ->withQueryString();
+
+        $topCustomers->getCollection()->transform(fn ($c) => [
+            'id' => $c->id,
+            'name' => $c->name,
+            'email' => $c->email,
+            'phone' => $c->phone,
+            'loyalty_points' => $c->loyalty_points,
+            'orders_count' => (int) $c->orders_count,
+            'total_spent' => round((float) ($c->total_spent ?? 0), 2),
+            'avg_order' => $c->orders_count > 0 ? round(($c->total_spent ?? 0) / $c->orders_count, 2) : 0,
+        ]);
 
         return Inertia::render('reports/customer-sales', [
             'topCustomers' => $topCustomers,
@@ -530,18 +554,24 @@ class ReportController extends Controller
      */
     public function inventorySales(Request $request): Response
     {
-        $products = Product::with(['category', 'inventory'])->get();
-
-        $currentStockCount = $products->sum(fn ($p) => $p->inventory->quantity ?? 0);
-        $lowStockCount = $products->filter(fn ($p) => ($p->inventory->quantity ?? 0) <= ($p->inventory->low_stock_threshold ?? 5) && ($p->inventory->quantity ?? 0) > 0)->count();
-        $outOfStockCount = $products->filter(fn ($p) => ($p->inventory->quantity ?? 0) <= 0)->count();
+        // For summary cards, load all products
+        $allProducts = Product::with(['category', 'inventory'])->get();
+        $currentStockCount = $allProducts->sum(fn ($p) => $p->inventory->quantity ?? 0);
+        $lowStockCount = $allProducts->filter(fn ($p) => ($p->inventory->quantity ?? 0) <= ($p->inventory->low_stock_threshold ?? 5) && ($p->inventory->quantity ?? 0) > 0)->count();
+        $outOfStockCount = $allProducts->filter(fn ($p) => ($p->inventory->quantity ?? 0) <= 0)->count();
 
         // Calculate cost and retail valuation directly from active batches
         $activeBatches = InventoryBatch::where('status', 'active')->get();
         $stockCostValue = $activeBatches->sum(fn ($b) => $b->available_quantity * (float) $b->purchase_price);
         $stockRetailValue = $activeBatches->sum(fn ($b) => $b->available_quantity * (float) $b->selling_price);
 
-        $inventoryList = $products->map(fn ($p) => [
+        // Paginated inventory list
+        $productsPaginated = Product::with(['category', 'inventory'])
+            ->orderBy('name')
+            ->paginate(25)
+            ->withQueryString();
+
+        $productsPaginated->getCollection()->transform(fn ($p) => [
             'id' => $p->id,
             'name' => $p->name,
             'sku' => $p->sku,
@@ -557,7 +587,7 @@ class ReportController extends Controller
         ]);
 
         return Inertia::render('reports/inventory-sales', [
-            'inventoryList' => $inventoryList,
+            'inventoryList' => $productsPaginated,
             'summary' => [
                 'currentStock' => $currentStockCount,
                 'lowStock' => $lowStockCount,
@@ -616,13 +646,15 @@ class ReportController extends Controller
     public function expiryReport(Request $request): Response
     {
         $filter = $request->input('filter', 'all');
-        $batches = $this->expiryService->getExpiringBatchesReport($filter === 'all' ? null : $filter);
+        $perPage = 20;
+        $page = max(1, (int) $request->input('page', 1));
+
+        $allBatches = $this->expiryService->getExpiringBatchesReport($filter === 'all' ? null : $filter);
 
         $expiredLoss = 0.0;
         $totalWastedItems = 0;
         $activeBatchesCount = 0;
-
-        foreach ($batches as $b) {
+        foreach ($allBatches as $b) {
             if ($b['status'] === 'expired') {
                 $expiredLoss += $b['cost_price'] * $b['quantity'];
                 $totalWastedItems += $b['quantity'];
@@ -631,13 +663,32 @@ class ReportController extends Controller
             }
         }
 
+        $total = count($allBatches);
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $lastPage);
+        $pagedBatches = array_slice($allBatches, ($page - 1) * $perPage, $perPage);
+
+        $baseUrl = url('/reports/expiry-report') . '?filter=' . urlencode($filter);
+        $links = [];
+        $links[] = ['url' => $page > 1 ? $baseUrl . '&page=' . ($page - 1) : null, 'label' => '&laquo; Previous', 'active' => false];
+        for ($i = 1; $i <= $lastPage; $i++) {
+            $links[] = ['url' => $baseUrl . '&page=' . $i, 'label' => (string) $i, 'active' => $i === $page];
+        }
+        $links[] = ['url' => $page < $lastPage ? $baseUrl . '&page=' . ($page + 1) : null, 'label' => 'Next &raquo;', 'active' => false];
+
         return Inertia::render('reports/expiry-report', [
-            'batches' => $batches,
+            'batches' => [
+                'data' => $pagedBatches,
+                'links' => $links,
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'total' => $total,
+            ],
             'summary' => [
                 'expiredLoss' => round($expiredLoss, 2),
                 'totalWastedItems' => $totalWastedItems,
                 'activeBatchesCount' => $activeBatchesCount,
-                'totalAlertsCount' => count($batches),
+                'totalAlertsCount' => $total,
             ],
             'filters' => [
                 'filter' => $filter,

@@ -3,6 +3,7 @@ import { Head, router } from '@inertiajs/react';
 import { AlertOctagon, AlertTriangle, Calendar, Filter, Printer, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TablePagination } from '@/components/ui/table-pagination';
 import AppLayout from '@/layouts/app-layout';
 
 interface BatchRow {
@@ -18,7 +19,13 @@ interface BatchRow {
 }
 
 interface Props {
-    batches: BatchRow[];
+    batches: {
+        data: BatchRow[];
+        links: { url: string | null; label: string; active: boolean }[];
+        current_page: number;
+        last_page: number;
+        total: number;
+    };
     summary: {
         expiredLoss: number;
         totalWastedItems: number;
@@ -34,8 +41,9 @@ function formatCurrency(val: number) {
     return `Rs. ${Number(val).toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
 }
 
-export default function ExpiryReport({ batches = [], summary, filters }: Props) {
+export default function ExpiryReport({ batches, summary, filters }: Props) {
     const [filter, setFilter] = useState(filters.filter || 'all');
+    const rows = batches?.data ?? [];
 
     const handleFilterChange = (newFilter: string) => {
         setFilter(newFilter);
@@ -145,14 +153,14 @@ export default function ExpiryReport({ batches = [], summary, filters }: Props) 
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/40">
-                                {batches.length === 0 ? (
+                                {rows.length === 0 ? (
                                     <tr>
                                         <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground font-bold">
                                             No stock batches match the active filter criteria.
                                         </td>
                                     </tr>
                                 ) : (
-                                    batches.map((b) => {
+                                    rows.map((b) => {
                                         const days = b.days_remaining;
                                         let badgeColor = 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
                                         let badgeLabel = 'Safe';
@@ -207,6 +215,13 @@ export default function ExpiryReport({ batches = [], summary, filters }: Props) 
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Pagination */}
+                    <TablePagination
+                        links={batches.links}
+                        currentPage={batches.current_page}
+                        lastPage={batches.last_page}
+                    />
                 </div>
             </div>
         </AppLayout>

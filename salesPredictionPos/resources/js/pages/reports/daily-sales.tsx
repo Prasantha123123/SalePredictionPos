@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import { TablePagination } from '@/components/ui/table-pagination';
 import {
     Calendar,
     CheckCircle2,
@@ -382,6 +383,13 @@ export default function DailySalesReport({
                         </table>
                     </div>
                 </div>
+
+                {/* Pagination */}
+                <TablePagination
+                    links={sales.links}
+                    currentPage={sales.current_page}
+                    lastPage={sales.last_page}
+                />
 
                 {/* Bottom Summary Bar */}
                 <div className="p-5 rounded-2xl bg-card border border-border/60 shadow-xs grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4 text-xs">

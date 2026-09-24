@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import { TablePagination } from '@/components/ui/table-pagination';
 import {
     Award,
     BarChart3,
@@ -305,6 +306,13 @@ export default function ProductSalesReport({
                     </div>
                 </div>
             </div>
+
+            {/* Pagination */}
+            <TablePagination
+                links={productSales.links}
+                currentPage={productSales.current_page}
+                lastPage={productSales.last_page}
+            />
 
             {/* PRODUCT ANALYTICS POPUP DIALOG */}
             <Dialog open={isAnalyticsOpen} onOpenChange={setIsAnalyticsOpen}>
