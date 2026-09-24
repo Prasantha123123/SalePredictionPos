@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, Save } from 'lucide-react';
 
 interface Role {
@@ -87,14 +87,28 @@ export default function UserEdit({ user, roles }: Props) {
                             </div>
                         </div>
 
-                        <div className="mt-6 flex justify-end gap-3">
-                            <Link href="/users" className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300">
-                                Cancel
-                            </Link>
-                            <button type="submit" disabled={processing}
-                                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
-                                <Save className="h-4 w-4" /> Update User
+                        <div className="mt-6 flex items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (confirm(`Are you sure you want to delete '${user.name}'?`)) {
+                                        router.delete(`/users/${user.id}`);
+                                    }
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-3.5 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-900/20"
+                            >
+                                Delete Account
                             </button>
+
+                            <div className="flex items-center gap-2">
+                                <Link href="/users" className="rounded-xl border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300">
+                                    Cancel
+                                </Link>
+                                <button type="submit" disabled={processing}
+                                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
+                                    <Save className="h-4 w-4" /> Update User
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </form>

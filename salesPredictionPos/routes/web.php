@@ -132,9 +132,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('forecasts.retrain');
 
     // Users (Admin only)
+    Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])
+        ->middleware('can:manage-users')
+        ->name('users.toggle-status');
     Route::resource('users', UserController::class)
         ->middleware('can:manage-users')
-        ->except(['show', 'destroy']);
+        ->except(['show']);
 
     // AI Assistant
     Route::post('ai/chat', [AIController::class, 'chat'])->name('ai.chat');
