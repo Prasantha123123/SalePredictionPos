@@ -101,7 +101,8 @@ class RolePermissionSeeder extends Seeder
 
         $cashier = Role::firstOrCreate(['name' => 'Cashier']);
         $cashier->givePermissionTo([
-            'view-dashboard',
+            // Cashiers: POS billing + customer lookup only
+            // No view-dashboard — on login they are redirected straight to /pos
             'create-sale',
             'manage-customers',
         ]);

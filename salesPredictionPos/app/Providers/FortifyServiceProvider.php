@@ -57,6 +57,18 @@ class FortifyServiceProvider extends ServiceProvider
 
             return null;
         });
+
+        // Role-based post-login redirect:
+        // Cashier → POS billing screen directly (no dashboard access)
+        // All other roles → dashboard
+        Fortify::redirects('login', function () {
+            /** @var \App\Models\User $user */
+            $user = auth()->user();
+            if ($user && $user->hasRole('Cashier')) {
+                return '/pos';
+            }
+            return '/dashboard';
+        });
     }
 
     /**

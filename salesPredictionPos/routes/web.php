@@ -19,8 +19,13 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    // Dashboard
-    Route::get('dashboard', DashboardController::class)
+    // Dashboard — Cashiers are redirected straight to POS (no dashboard access)
+    Route::get('dashboard', function () {
+        if (auth()->user()?->hasRole('Cashier')) {
+            return redirect()->route('pos.index');
+        }
+        return app(DashboardController::class)();
+    })
         ->middleware('can:view-dashboard')
         ->name('dashboard');
 
